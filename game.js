@@ -20,7 +20,7 @@ const CHAOS_EVENT_MAX_MS = 3100;
 // - Increase PLAYER_SPEED to make catching easier.
 // - Increase MUSHU_BASE_SPEED to make Mushu harder.
 // - Increase ARENA_MARGIN to reduce playable area (harder).
-const MUSHU_BASE_SPEED = 250;
+const MUSHU_BASE_SPEED = 330;
 const ARENA_MARGIN = 18;
 
 // How to change text:
@@ -31,6 +31,9 @@ const ARENA_MARGIN = 18;
 // =============================
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
+
+// Cached background for the canvas (rebuilt on resize).
+let bgCache = null;
 
 const startUI = document.getElementById('startUI');
 const endUI = document.getElementById('endUI');
@@ -94,6 +97,154 @@ function resizeCanvas(){
   canvas.height = h;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = true;
+  buildBackgroundCache();
+}
+
+function buildBackgroundCache(){
+  const w = canvas.width, h = canvas.height;
+  if (!w || !h) return;
+
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d', { alpha: false });
+
+  // Lawn gradient.
+  const lawn = g.createRadialGradient(
+    w * 0.52,
+    h * 0.18,
+    Math.min(w, h) * 0.08,
+    w * 0.52,
+    h * 0.55,
+    Math.max(w, h) * 0.95
+  );
+  lawn.addColorStop(0, '#c3f07a');
+  lawn.addColorStop(0.45, '#7bd77f');
+  lawn.addColorStop(1, '#2f8d52');
+  g.fillStyle = lawn;
+  g.fillRect(0, 0, w, h);
+
+  // Soft vignette for depth.
+  const vig = g.createRadialGradient(
+    w * 0.5,
+    h * 0.35,
+    Math.min(w, h) * 0.2,
+    w * 0.5,
+    h * 0.35,
+    Math.max(w, h) * 0.85
+  );
+  vig.addColorStop(0, 'rgba(255,255,255,0)');
+  vig.addColorStop(1, 'rgba(18,49,28,0.18)');
+  g.fillStyle = vig;
+  g.fillRect(0, 0, w, h);
+
+  // Stone path (subtle, centered).
+  const pathW = Math.min(w * 0.26, 240 * (window.devicePixelRatio || 1));
+  const pathX = w * 0.5 - pathW * 0.5;
+  const pathTop = h * 0.44;
+  const pathH = h * 0.52;
+  drawRoundedRect(g, pathX, pathTop, pathW, pathH, Math.min(28, pathW * 0.25), 'rgba(233,238,241,0.22)', 'rgba(255,255,255,0.28)');
+  // Tile hints.
+  g.strokeStyle = 'rgba(18,49,28,0.07)';
+  g.lineWidth = Math.max(1, Math.round(1.2 * (window.devicePixelRatio || 1)));
+  for (let i = 0; i < 16; i++){
+    const yy = pathTop + (pathH * (i / 16));
+    g.beginPath();
+    g.moveTo(pathX + 10, yy);
+    g.lineTo(pathX + pathW - 10, yy);
+    g.stroke();
+  }
+
+  // Flower beds (blush clusters).
+  const beds = [
+    { x: w * 0.24, y: h * 0.62, rx: w * 0.11, ry: h * 0.14 },
+    { x: w * 0.76, y: h * 0.62, rx: w * 0.11, ry: h * 0.14 },
+    { x: w * 0.32, y: h * 0.32, rx: w * 0.10, ry: h * 0.10 },
+    { x: w * 0.68, y: h * 0.32, rx: w * 0.10, ry: h * 0.10 },
+  ];
+  for (const b of beds){
+    drawBed(g, b.x, b.y, b.rx, b.ry);
+  }
+
+  // Light fountains (very subtle circles like the reference).
+  drawFountain(g, w * 0.13, h * 0.60, Math.min(w, h) * 0.085);
+  drawFountain(g, w * 0.87, h * 0.60, Math.min(w, h) * 0.085);
+
+  // Gentle sparkles.
+  g.fillStyle = 'rgba(255,255,255,0.10)';
+  for (let i = 0; i < 90; i++){
+    const x = Math.random() * w;
+    const y = Math.random() * h;
+    const r = Math.random() * 1.6 + 0.4;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  bgCache = { w, h, c };
+}
+
+function drawRoundedRect(g, x, y, w, h, r, fill, stroke){
+  const rr = Math.min(r, w / 2, h / 2);
+  g.beginPath();
+  g.moveTo(x + rr, y);
+  g.arcTo(x + w, y, x + w, y + h, rr);
+  g.arcTo(x + w, y + h, x, y + h, rr);
+  g.arcTo(x, y + h, x, y, rr);
+  g.arcTo(x, y, x + w, y, rr);
+  g.closePath();
+  if (fill){
+    g.fillStyle = fill;
+    g.fill();
+  }
+  if (stroke){
+    g.strokeStyle = stroke;
+    g.lineWidth = Math.max(1, Math.round(2 * (window.devicePixelRatio || 1)));
+    g.stroke();
+  }
+}
+
+function drawBed(g, cx, cy, rx, ry){
+  // Base greenery.
+  g.fillStyle = 'rgba(30,115,63,0.28)';
+  g.beginPath();
+  g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  g.fill();
+
+  // Blush flowers.
+  for (let i = 0; i < 85; i++){
+    const t = Math.random() * Math.PI * 2;
+    const rr = Math.sqrt(Math.random());
+    const x = cx + Math.cos(t) * rx * rr;
+    const y = cy + Math.sin(t) * ry * rr;
+    const r = Math.random() * 2.6 + 1.2;
+    g.fillStyle = Math.random() < 0.25 ? 'rgba(255,123,184,0.32)' : 'rgba(255,210,231,0.32)';
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+function drawFountain(g, cx, cy, r){
+  g.fillStyle = 'rgba(233,238,241,0.24)';
+  g.beginPath();
+  g.arc(cx, cy, r, 0, Math.PI * 2);
+  g.fill();
+
+  g.strokeStyle = 'rgba(255,255,255,0.30)';
+  g.lineWidth = Math.max(1, Math.round(2 * (window.devicePixelRatio || 1)));
+  g.beginPath();
+  g.arc(cx, cy, r, 0, Math.PI * 2);
+  g.stroke();
+
+  const water = g.createRadialGradient(cx - r * 0.25, cy - r * 0.25, r * 0.15, cx, cy, r);
+  water.addColorStop(0, 'rgba(255,255,255,0.28)');
+  water.addColorStop(0.35, 'rgba(103,199,255,0.24)');
+  water.addColorStop(1, 'rgba(103,199,255,0.10)');
+  g.fillStyle = water;
+  g.beginPath();
+  g.arc(cx, cy, r * 0.72, 0, Math.PI * 2);
+  g.fill();
 }
 
 function clampBodyToArena(body){
@@ -273,7 +424,6 @@ const world = {
   instructionsUntil: 0,
   shakeUntil: 0,
 
-  controlsInverted: false,
   mushuBoost: 1,
   brideRage: false,
 
@@ -340,17 +490,17 @@ function resetGameToPlaying(){
   world.chaosUntil = 0;
   world.instructionsUntil = world.t + 5;
   world.shakeUntil = 0;
-  world.controlsInverted = false;
   world.mushuBoost = 1;
   world.brideRage = false;
   world.caught = false;
   world.endReason = '';
 
   // Start positions (portrait-ish)
-  ofer.x = w * 0.5; ofer.y = h * 0.78;
+  // Keep initial action closer to screen center (less "spawn at bottom / ceiling").
+  ofer.x = w * 0.5; ofer.y = h * 0.70;
   ofer.vx = 0; ofer.vy = 0;
 
-  mushu.x = w * 0.5; mushu.y = h * 0.30;
+  mushu.x = w * 0.5; mushu.y = h * 0.40;
   mushu.vx = rand(-120, 120); mushu.vy = rand(-60, 60);
   mushu.hasRings = true;
   mushu.mood = rand(0, 1000);
@@ -395,7 +545,6 @@ function enterEnd(reason){
 const ChaosEvent = Object.freeze({
   MUSHU_BOOST: 'Mushu speed boost',
   GRAVITY_FLIP: 'Gravity flip (vertical)',
-  CONTROLS_INVERT: 'Controls invert',
   SCREEN_SHAKE: 'Screen shake',
   BRIDE_RAGE: 'Bride Rage Mode',
 });
@@ -404,7 +553,6 @@ const ChaosEvent = Object.freeze({
 const CHAOS_WEIGHTS = [
   [ChaosEvent.MUSHU_BOOST, 1.1],
   [ChaosEvent.GRAVITY_FLIP, 1.0],
-  [ChaosEvent.CONTROLS_INVERT, 1.35],
   [ChaosEvent.SCREEN_SHAKE, 1.25],
   [ChaosEvent.BRIDE_RAGE, 1.15],
 ];
@@ -424,7 +572,6 @@ function clearChaosEffects(){
   world.chaosActive = false;
   world.chaosName = 'calm-ish';
   world.mushuBoost = 1;
-  world.controlsInverted = false;
   world.flipGravity = false;
   world.brideRage = false;
   world.shakeUntil = 0;
@@ -451,9 +598,6 @@ function startChaosEvent(name){
       break;
     case ChaosEvent.GRAVITY_FLIP:
       world.flipGravity = true;
-      break;
-    case ChaosEvent.CONTROLS_INVERT:
-      world.controlsInverted = true;
       break;
     case ChaosEvent.SCREEN_SHAKE:
       world.shakeUntil = t + dur;
@@ -503,10 +647,10 @@ function boundsBounce(body, gainy){
   if (body.y > maxY){ body.y = maxY; body.vy = -Math.abs(body.vy) * bounce; body.vx *= squish; }
 }
 
-function applyDrag(body, dt){
+function applyDrag(body, dt, base){
   // Slightly wrong friction (dt^ish), for chaotic feel.
-  const base = 0.92;
-  const f = Math.pow(base, dt * 60);
+  const b = base ?? 0.92;
+  const f = Math.pow(b, dt * 60);
   body.vx *= f;
   body.vy *= f;
 }
@@ -514,16 +658,14 @@ function applyDrag(body, dt){
 function steerOfer(dt){
   if (!input.active) return;
   // Drag steering: Ofer follows your finger like a magnet on a skateboard.
-  // (Controls invert chaos flips the intent.)
   const tx = input.x;
   const ty = input.y;
   const dx = (tx - ofer.x);
   const dy = (ty - ofer.y);
 
-  const inv = world.controlsInverted ? -1 : 1;
   // Spring acceleration + a little "finger impulse" from drag delta.
-  const ax = (dx * 3.2 + input.dx * 10) * inv;
-  const ay = (dy * 3.2 + input.dy * 10) * inv;
+  const ax = (dx * 3.2 + input.dx * 10);
+  const ay = (dy * 3.2 + input.dy * 10);
 
   const accel = PLAYER_SPEED;
   ofer.vx += clamp(ax, -accel, accel) * dt;
@@ -571,11 +713,35 @@ function updateMushuAI(dt){
   const m2 = Math.hypot(vx, vy) || 1;
   vx /= m2; vy /= m2;
 
+  // Tiny continuous wobble so movement feels "alive" even without zig.
+  const wob = Math.sin((t * 6.2) + mushu.mood * 2.7) * 0.22;
+  const wob2 = Math.cos((t * 5.1) + mushu.mood * 2.1) * 0.18;
+  vx += wob; vy += wob2;
+
+  // Re-normalize after wobble.
+  const m3 = Math.hypot(vx, vy) || 1;
+  vx /= m3; vy /= m3;
+
+  // Soft bias away from the very top of the arena so Mushu doesn't "live" up there.
+  // (This keeps gameplay visually centered without making him easier to catch.)
+  if (mushu.y < world.h * 0.26){
+    const push = clamp((world.h * 0.26 - mushu.y) / (world.h * 0.26), 0, 1);
+    vy = vy * 0.7 + 0.9 * push;
+  }
+
   // Base speed + chaos boost
   const speed = (MUSHU_BASE_SPEED + 110 * Math.sin(mushu.mood * 2.1)) * world.mushuBoost;
   // Intentionally "wrong": dt scaling is slightly off for comedic slipperiness.
   mushu.vx += vx * speed * dt * rand(0.92, 1.08);
   mushu.vy += vy * speed * dt * rand(0.92, 1.08);
+
+  // If he ever slows down too much, give him a small kick.
+  const v = Math.hypot(mushu.vx, mushu.vy);
+  if (v < 120){
+    const a = rand(0, Math.PI * 2);
+    mushu.vx += Math.cos(a) * 110;
+    mushu.vy += Math.sin(a) * 110;
+  }
 }
 
 function updateTal(dt){
@@ -604,7 +770,7 @@ function updateTal(dt){
 
   tal.x += tal.vx * dt;
   tal.y += tal.vy * dt;
-  applyDrag(tal, dt);
+  applyDrag(tal, dt, 0.94);
   boundsBounce(tal, true);
 }
 
@@ -677,8 +843,8 @@ function update(dt){
   mushu.y += mushu.vy * dt;
 
   // Drag + bounce
-  applyDrag(ofer, dt);
-  applyDrag(mushu, dt);
+  applyDrag(ofer, dt, 0.92);
+  applyDrag(mushu, dt, 0.955);
   boundsBounce(ofer, true);
   boundsBounce(mushu, false);
 
@@ -712,7 +878,7 @@ function update(dt){
 // Render
 // =============================
 function drawLabel(text, x, y){
-  ctx.font = '700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+  ctx.font = '800 15px ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
 
@@ -722,14 +888,14 @@ function drawLabel(text, x, y){
   const rx = x - w / 2;
   const ry = y - h - 6;
 
-  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.fillStyle = 'rgba(255,250,243,.70)';
   roundRect(rx, ry, w, h, 10);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.12)';
+  ctx.strokeStyle = 'rgba(18,49,28,.14)';
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.fillStyle = 'rgba(18,49,28,.92)';
   ctx.fillText(text, x, y - 8);
 }
 
@@ -754,17 +920,13 @@ function render(){
     ctx.translate(rand(-1, 1) * s * 6, rand(-1, 1) * s * 6);
   }
 
-  // Background
-  ctx.fillStyle = '#0b0b10';
-  ctx.fillRect(0, 0, w, h);
-
-  // "Wedding hall" floor line
-  ctx.strokeStyle = 'rgba(255,255,255,.09)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(ARENA_MARGIN, h * 0.62);
-  ctx.lineTo(w - ARENA_MARGIN, h * 0.62);
-  ctx.stroke();
+  // Background (garden wedding vibe).
+  if (!bgCache || bgCache.w !== w || bgCache.h !== h) buildBackgroundCache();
+  if (bgCache) ctx.drawImage(bgCache.c, 0, 0);
+  else {
+    ctx.fillStyle = '#7bd77f';
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // Ring aura around Mushu if he has rings
   if (mushu.hasRings){
