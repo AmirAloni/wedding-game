@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0b10" />
+    <title>Wedding Chaos: Ofer vs Mushu</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main id="app" aria-label="Wedding Chaos game">
+      <canvas id="game" aria-label="Game canvas"></canvas>
+
+      <!-- IDLE UI -->
+      <section id="startUI" class="overlay overlay--center" aria-label="Start screen">
+        <div class="panel">
+          <div class="title">WEDDING CHAOS</div>
+          <div class="subtitle">Catch Mushu (🐶) before he yeets the rings into another timeline.</div>
+          <button id="startBtn" class="bigBtn" type="button">START CHAOS</button>
+          <div class="tiny">
+            Mobile only • Touch drag • Portrait recommended
+          </div>
+        </div>
+      </section>
+
+      <!-- PLAYING instructions (non-blocking, auto hides) -->
+      <div id="hud" class="hud" aria-label="HUD">
+        <div class="hudRow">
+          <div id="timer" class="pill">30.0s</div>
+          <div id="chaos" class="pill pill--chaos">CHAOS: calm-ish</div>
+        </div>
+        <div id="instructions" class="instructions">
+          Drag your finger to steer Ofer 🤵. Catch Mushu 🐶.
+          <br />
+          Every 5 seconds: random chaos for a few seconds. Physics may lie.
+        </div>
+      </div>
+
+      <!-- END UI -->
+      <section id="endUI" class="overlay overlay--center isHidden" aria-label="End screen">
+        <div class="panel">
+          <div id="endTitle" class="title">CHAOS RESULT</div>
+          <div id="endText" class="subtitle"></div>
+          <button id="restartBtn" class="bigBtn" type="button">RESTART CHAOS</button>
+          <div class="tiny">
+            Tip: winning is optional. Comedy is mandatory.
+          </div>
+        </div>
+      </section>
+
+      <!-- Landscape warning -->
+      <section id="rotateUI" class="overlay overlay--center isHidden" aria-label="Rotate device">
+        <div class="panel">
+          <div class="title">PORTRAIT ONLY</div>
+          <div class="subtitle">Rotate back. The wedding is already unstable.</div>
+        </div>
+      </section>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
