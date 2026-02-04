@@ -13,8 +13,8 @@ const PLAYER_SPEED = 1250;      // "oomph" for Ofer (higher = snappier, easier)
 // How to tweak chaos:
 // - Change CHAOS_EVENT_MIN_MS / CHAOS_EVENT_MAX_MS to make chaos shorter/longer.
 // - Change CHAOS_WEIGHTS to bias which events happen more.
-const CHAOS_EVENT_MIN_MS = 2100;
-const CHAOS_EVENT_MAX_MS = 3100;
+const CHAOS_EVENT_MIN_MS = 4000;
+const CHAOS_EVENT_MAX_MS = 4000;
 
 // How to adjust difficulty:
 // - Increase PLAYER_SPEED to make catching easier.
@@ -138,48 +138,7 @@ function buildBackgroundCache(){
   g.fillStyle = vig;
   g.fillRect(0, 0, w, h);
 
-  // Stone path (subtle, centered).
-  const pathW = Math.min(w * 0.26, 240 * (window.devicePixelRatio || 1));
-  const pathX = w * 0.5 - pathW * 0.5;
-  const pathTop = h * 0.44;
-  const pathH = h * 0.52;
-  drawRoundedRect(g, pathX, pathTop, pathW, pathH, Math.min(28, pathW * 0.25), 'rgba(233,238,241,0.22)', 'rgba(255,255,255,0.28)');
-  // Tile hints.
-  g.strokeStyle = 'rgba(18,49,28,0.07)';
-  g.lineWidth = Math.max(1, Math.round(1.2 * (window.devicePixelRatio || 1)));
-  for (let i = 0; i < 16; i++){
-    const yy = pathTop + (pathH * (i / 16));
-    g.beginPath();
-    g.moveTo(pathX + 10, yy);
-    g.lineTo(pathX + pathW - 10, yy);
-    g.stroke();
-  }
-
-  // Flower beds (blush clusters).
-  const beds = [
-    { x: w * 0.24, y: h * 0.62, rx: w * 0.11, ry: h * 0.14 },
-    { x: w * 0.76, y: h * 0.62, rx: w * 0.11, ry: h * 0.14 },
-    { x: w * 0.32, y: h * 0.32, rx: w * 0.10, ry: h * 0.10 },
-    { x: w * 0.68, y: h * 0.32, rx: w * 0.10, ry: h * 0.10 },
-  ];
-  for (const b of beds){
-    drawBed(g, b.x, b.y, b.rx, b.ry);
-  }
-
-  // Light fountains (very subtle circles like the reference).
-  drawFountain(g, w * 0.13, h * 0.60, Math.min(w, h) * 0.085);
-  drawFountain(g, w * 0.87, h * 0.60, Math.min(w, h) * 0.085);
-
-  // Gentle sparkles.
-  g.fillStyle = 'rgba(255,255,255,0.10)';
-  for (let i = 0; i < 90; i++){
-    const x = Math.random() * w;
-    const y = Math.random() * h;
-    const r = Math.random() * 1.6 + 0.4;
-    g.beginPath();
-    g.arc(x, y, r, 0, Math.PI * 2);
-    g.fill();
-  }
+  // Keep background clean: no decorative ellipses/circles over the lawn.
 
   bgCache = { w, h, c };
 }
@@ -261,9 +220,11 @@ function clampBodyToArena(body){
 function syncWorldToCanvasSize(){
   world.w = canvas.width;
   world.h = canvas.height;
+  buildObstacles();
   clampBodyToArena(ofer);
   clampBodyToArena(mushu);
   clampBodyToArena(tal);
+  nudgeBodiesOutOfObstacles();
 }
 
 // =============================
@@ -413,13 +374,11 @@ const world = {
   dt: 0,
   w: 0,
   h: 0,
-  gravityY: 520, // intentionally a bit strong for comedy
-  flipGravity: false,
 
   timeLeft: GAME_DURATION,
   chaosCountdown: CHAOS_INTERVAL,
   chaosActive: false,
-  chaosName: 'calm-ish',
+  chaosName: 'רגוע(בערך)',
   chaosUntil: 0,
   instructionsUntil: 0,
   shakeUntil: 0,
@@ -436,7 +395,7 @@ const ofer = {
   vx: 0, vy: 0,
   r: 22,
   color: '#3cffb0',
-  label: 'Ofer 🤵',
+  label: 'עופר 🤵',
 };
 
 const mushu = {
@@ -444,7 +403,7 @@ const mushu = {
   vx: 0, vy: 0,
   r: 18,
   color: '#ff4fd8',
-  label: 'Mushu 🐶',
+  label: 'מושו 🐶',
   hasRings: true,
   mood: 0,
   zigUntil: 0,
@@ -455,9 +414,182 @@ const tal = {
   vx: 0, vy: 0,
   r: 20,
   color: '#ffd36b',
-  label: 'Tal 👰',
+  label: 'טל 👰',
   visible: true,
 };
+
+// =============================
+// Obstacles (wedding props)
+// =============================
+const obstacles = [];
+
+function buildObstacles(){
+  obstacles.length = 0;
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  if (!w || !h) return;
+
+  const m = ARENA_MARGIN + 10;
+  const left = m;
+  const right = w - m;
+  const top = m;
+  const bottom = h - m;
+
+  // Chuppah near the top center.
+  const chW = clamp(w * 0.46, 190, 280);
+  const chH = clamp(h * 0.12, 84, 128);
+  const chX = clamp(w * 0.5 - chW / 2, left, right - chW);
+  const chY = clamp(top + h * 0.07, top, bottom - chH);
+  obstacles.push({
+    kind: 'rect',
+    type: 'chuppah',
+    x: chX,
+    y: chY,
+    w: chW,
+    h: chH,
+    r: 16,
+  });
+
+  // Tables + chairs in the middle-ish area.
+  const tableR = clamp(Math.min(w, h) * 0.055, 34, 52);
+  const tableY = clamp(h * 0.60, top + chH + 70, bottom - tableR - 40);
+  const tableX1 = clamp(w * 0.28, left + tableR + 30, right - tableR - 30);
+  const tableX2 = clamp(w * 0.72, left + tableR + 30, right - tableR - 30);
+
+  const tables = [
+    { x: tableX1, y: tableY },
+    { x: tableX2, y: tableY + clamp(h * 0.02, -18, 18) },
+  ];
+
+  for (const t of tables){
+    obstacles.push({ kind: 'circle', type: 'table', x: t.x, y: t.y, r: tableR });
+
+    const chairR = clamp(tableR * 0.42, 14, 22);
+    const ring = tableR + chairR + 10;
+    const chairAngles = [
+      0,
+      Math.PI / 3,
+      (2 * Math.PI) / 3,
+      Math.PI,
+      (4 * Math.PI) / 3,
+      (5 * Math.PI) / 3,
+    ];
+    for (const a of chairAngles){
+      const cx = t.x + Math.cos(a) * ring;
+      const cy = t.y + Math.sin(a) * ring;
+      if (cx < left + chairR || cx > right - chairR || cy < top + chairR || cy > bottom - chairR) continue;
+      obstacles.push({ kind: 'circle', type: 'chair', x: cx, y: cy, r: chairR });
+    }
+  }
+}
+
+function resolveCircleVsCircleObstacle(body, o){
+  const rr = body.r + o.r;
+  const d2 = dist2(body.x, body.y, o.x, o.y);
+  if (d2 >= rr * rr) return false;
+
+  const d = Math.sqrt(d2) || 0.0001;
+  const nx = (body.x - o.x) / d;
+  const ny = (body.y - o.y) / d;
+  const overlap = rr - d;
+
+  body.x += nx * overlap;
+  body.y += ny * overlap;
+
+  const vn = body.vx * nx + body.vy * ny;
+  if (vn < 0){
+    const restitution = 0.18;
+    body.vx -= (1 + restitution) * vn * nx;
+    body.vy -= (1 + restitution) * vn * ny;
+  }
+
+  return true;
+}
+
+function resolveCircleVsRectObstacle(body, o){
+  const x1 = o.x;
+  const y1 = o.y;
+  const x2 = o.x + o.w;
+  const y2 = o.y + o.h;
+
+  const cx = clamp(body.x, x1, x2);
+  const cy = clamp(body.y, y1, y2);
+
+  let dx = body.x - cx;
+  let dy = body.y - cy;
+  let d2 = dx * dx + dy * dy;
+
+  // Circle center inside rect: push out in one step (nearest side).
+  if (d2 === 0){
+    const distL = body.x - x1;
+    const distR = x2 - body.x;
+    const distT = body.y - y1;
+    const distB = y2 - body.y;
+
+    const pushL = body.r + distL;
+    const pushR = body.r + distR;
+    const pushT = body.r + distT;
+    const pushB = body.r + distB;
+
+    const minPush = Math.min(pushL, pushR, pushT, pushB);
+    let nx = 0, ny = 0;
+    if (minPush === pushL){ nx = -1; ny = 0; }
+    else if (minPush === pushR){ nx = 1; ny = 0; }
+    else if (minPush === pushT){ nx = 0; ny = -1; }
+    else { nx = 0; ny = 1; }
+
+    body.x += nx * minPush;
+    body.y += ny * minPush;
+
+    const vn = body.vx * nx + body.vy * ny;
+    if (vn < 0){
+      const restitution = 0.14;
+      body.vx -= (1 + restitution) * vn * nx;
+      body.vy -= (1 + restitution) * vn * ny;
+    }
+
+    return true;
+  }
+
+  if (d2 >= body.r * body.r) return false;
+
+  const d = Math.sqrt(d2) || 0.0001;
+  const nx = dx / d;
+  const ny = dy / d;
+  const overlap = body.r - d;
+
+  body.x += nx * overlap;
+  body.y += ny * overlap;
+
+  const vn = body.vx * nx + body.vy * ny;
+  if (vn < 0){
+    const restitution = 0.14;
+    body.vx -= (1 + restitution) * vn * nx;
+    body.vy -= (1 + restitution) * vn * ny;
+  }
+
+  return true;
+}
+
+function resolveBodyVsObstacles(body){
+  let hit = false;
+  for (const o of obstacles){
+    if (o.kind === 'circle') hit = resolveCircleVsCircleObstacle(body, o) || hit;
+    else hit = resolveCircleVsRectObstacle(body, o) || hit;
+  }
+  return hit;
+}
+
+function nudgeBodiesOutOfObstacles(){
+  // A few iterations to prevent spawning inside props on resize.
+  for (let i = 0; i < 6; i++){
+    let any = false;
+    any = resolveBodyVsObstacles(ofer) || any;
+    any = resolveBodyVsObstacles(mushu) || any;
+    any = (tal.visible && resolveBodyVsObstacles(tal)) || any;
+    if (!any) break;
+  }
+}
 
 const particles = [];
 function spawnConfetti(n, x, y, strength){
@@ -481,12 +613,10 @@ function resetGameToPlaying(){
   world.t = nowSec();
   world.lastT = world.t;
   world.dt = 0;
-  world.flipGravity = false;
-  world.gravityY = 520;
   world.timeLeft = GAME_DURATION;
   world.chaosCountdown = CHAOS_INTERVAL;
   world.chaosActive = false;
-  world.chaosName = 'calm-ish';
+  world.chaosName = 'רגוע(בערך)';
   world.chaosUntil = 0;
   world.instructionsUntil = world.t + 5;
   world.shakeUntil = 0;
@@ -514,6 +644,7 @@ function resetGameToPlaying(){
   clampBodyToArena(ofer);
   clampBodyToArena(mushu);
   clampBodyToArena(tal);
+  nudgeBodiesOutOfObstacles();
 
   particles.length = 0;
 
@@ -540,19 +671,17 @@ function enterEnd(reason){
 
 // =============================
 // Chaos system (MANDATORY)
-// Every 5 seconds, pick 1 event for ~2–3 seconds.
+// Every 5 seconds, pick 1 event for ~4 seconds.
 // =============================
 const ChaosEvent = Object.freeze({
-  MUSHU_BOOST: 'Mushu speed boost',
-  GRAVITY_FLIP: 'Gravity flip (vertical)',
-  SCREEN_SHAKE: 'Screen shake',
-  BRIDE_RAGE: 'Bride Rage Mode',
+  MUSHU_BOOST: 'מושו: בוסט מהירות',
+  SCREEN_SHAKE: 'רעידת מסך',
+  BRIDE_RAGE: 'מצב: טל עצבנית',
 });
 
 // Bias: more goofy camera + controls.
 const CHAOS_WEIGHTS = [
   [ChaosEvent.MUSHU_BOOST, 1.1],
-  [ChaosEvent.GRAVITY_FLIP, 1.0],
   [ChaosEvent.SCREEN_SHAKE, 1.25],
   [ChaosEvent.BRIDE_RAGE, 1.15],
 ];
@@ -570,9 +699,8 @@ function pickWeighted(weights){
 
 function clearChaosEffects(){
   world.chaosActive = false;
-  world.chaosName = 'calm-ish';
+  world.chaosName = 'רגוע(בערך)';
   world.mushuBoost = 1;
-  world.flipGravity = false;
   world.brideRage = false;
   world.shakeUntil = 0;
 }
@@ -595,9 +723,6 @@ function startChaosEvent(name){
       world.mushuBoost = rand(1.6, 2.3);
       mushu.vx *= rand(1.05, 1.25);
       mushu.vy *= rand(1.05, 1.25);
-      break;
-    case ChaosEvent.GRAVITY_FLIP:
-      world.flipGravity = true;
       break;
     case ChaosEvent.SCREEN_SHAKE:
       world.shakeUntil = t + dur;
@@ -751,16 +876,42 @@ function updateTal(dt){
   const w = world.w, h = world.h;
   const t = world.t;
 
+  // Grow a bit during Bride Rage so she can actually block the path.
+  const targetR = world.brideRage ? 30 : 20;
+  tal.r = lerp(tal.r, targetR, clamp(dt * 10, 0, 1));
+  clampBodyToArena(tal);
+
   // Gentle drift
   tal.vx += Math.sin(t * 0.9) * 20 * dt;
   tal.vy += Math.cos(t * 0.7) * 18 * dt;
 
   if (world.brideRage){
-    // She becomes laser-focused on "NO ONE RUNS AT MY WEDDING"
-    const tx = ((ofer.x + mushu.x) * 0.5) - tal.x;
-    const ty = ((ofer.y + mushu.y) * 0.5) - tal.y;
-    tal.vx += clamp(tx * 1.8, -520, 520) * dt;
-    tal.vy += clamp(ty * 1.8, -520, 520) * dt;
+    // She becomes laser-focused on "NO ONE RUNS AT MY WEDDING":
+    // stay BETWEEN Ofer and Mushu (on their line), acting as a blocker.
+    let dx = mushu.x - ofer.x;
+    let dy = mushu.y - ofer.y;
+    const d = Math.hypot(dx, dy) || 1;
+    dx /= d; dy /= d;
+    const px = -dy, py = dx; // perpendicular
+
+    // Desired point along the segment Ofer→Mushu (slightly closer to Mushu to block better).
+    const minAlong = ofer.r + tal.r + 12;
+    const maxAlong = d - (mushu.r + tal.r + 12);
+    const desiredAlong = clamp(d * 0.58, minAlong, Math.max(minAlong, maxAlong));
+
+    // Express Tal position in (along, side) relative to Ofer→Mushu line.
+    const rx = tal.x - ofer.x;
+    const ry = tal.y - ofer.y;
+    const along = rx * dx + ry * dy;
+    const side = rx * px + ry * py;
+
+    // Strongly correct both along + side errors so Tal sticks "between" them.
+    const errAlong = desiredAlong - along;
+    const errSide = -side;
+    const ax = (dx * errAlong * 7.0) + (px * errSide * 12.0);
+    const ay = (dy * errAlong * 7.0) + (py * errSide * 12.0);
+    tal.vx += clamp(ax, -1800, 1800) * dt;
+    tal.vy += clamp(ay, -1800, 1800) * dt;
 
     // Wind field (slightly wrong): pushes everyone sideways.
     const wind = Math.sin(t * 9.5) * 280;
@@ -770,7 +921,7 @@ function updateTal(dt){
 
   tal.x += tal.vx * dt;
   tal.y += tal.vy * dt;
-  applyDrag(tal, dt, 0.94);
+  applyDrag(tal, dt, world.brideRage ? 0.965 : 0.94);
   boundsBounce(tal, true);
 }
 
@@ -802,7 +953,6 @@ function updateParticles(dt){
     const p = particles[i];
     p.life -= dt;
     if (p.life <= 0){ particles.splice(i, 1); continue; }
-    p.vy += (world.flipGravity ? -1 : 1) * (world.gravityY * 0.22) * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.vx *= Math.pow(0.92, dt * 60);
@@ -827,11 +977,6 @@ function update(dt){
   // Ofer controls
   steerOfer(dt);
 
-  // Gravity (vertical flip chaos)
-  const gy = (world.flipGravity ? -1 : 1) * world.gravityY;
-  ofer.vy += gy * dt * 0.35;
-  mushu.vy += gy * dt * 0.18;
-
   // AI + Tal
   updateMushuAI(dt);
   updateTal(dt);
@@ -854,6 +999,11 @@ function update(dt){
     const bonked2 = resolveSoftCollision(mushu, tal);
     if ((bonked1 || bonked2) && audio) audio.sfx.bonk();
   }
+
+  // Wedding props collisions (tables/chairs/chuppah): nobody passes through.
+  resolveBodyVsObstacles(ofer);
+  resolveBodyVsObstacles(mushu);
+  if (tal.visible) resolveBodyVsObstacles(tal);
 
   // Catch check
   const rr = ofer.r + mushu.r;
@@ -928,6 +1078,62 @@ function render(){
     ctx.fillRect(0, 0, w, h);
   }
 
+  // Wedding props (obstacles)
+  if (!obstacles.length) buildObstacles();
+  for (const o of obstacles){
+    if (o.type === 'table'){
+      // Table cloth
+      ctx.fillStyle = 'rgba(255,250,243,.86)';
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rim + flower ring
+      ctx.strokeStyle = 'rgba(18,49,28,.16)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(255,123,184,.26)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r * 0.72, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (o.type === 'chair'){
+      // Simple chair blob
+      ctx.fillStyle = 'rgba(233,238,241,.78)';
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(18,49,28,.12)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (o.type === 'chuppah'){
+      // Canopy + poles
+      const pad = 10;
+      const canopyH = Math.max(20, o.h * 0.42);
+      drawRoundedRect(ctx, o.x, o.y, o.w, canopyH, o.r, 'rgba(255,210,231,.55)', 'rgba(18,49,28,.14)');
+
+      // Poles
+      const poleW = Math.max(6, Math.round(o.w * 0.035));
+      const poleH = o.h - canopyH + pad;
+      ctx.fillStyle = 'rgba(18,49,28,.22)';
+      ctx.fillRect(o.x + pad, o.y + canopyH - 2, poleW, poleH);
+      ctx.fillRect(o.x + o.w - pad - poleW, o.y + canopyH - 2, poleW, poleH);
+
+      // Little flowers on the canopy
+      ctx.fillStyle = 'rgba(255,123,184,.38)';
+      for (let i = 0; i < 8; i++){
+        const fx = o.x + (o.w * (0.12 + i * 0.11));
+        const fy = o.y + canopyH * 0.35 + Math.sin(i * 1.7) * 3;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 3.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
   // Ring aura around Mushu if he has rings
   if (mushu.hasRings){
     const pulse = 0.5 + 0.5 * Math.sin(world.t * 9);
@@ -960,8 +1166,8 @@ function render(){
   }
 
   // HUD text updates (DOM overlay)
-  timerEl.textContent = `${world.timeLeft.toFixed(1)}s`;
-  chaosEl.textContent = world.chaosActive ? `CHAOS: ${world.chaosName}` : 'CHAOS: calm-ish';
+  timerEl.textContent = `${world.timeLeft.toFixed(1)}ש׳`;
+  chaosEl.textContent = world.chaosActive ? `כאוס: ${world.chaosName}` : 'כאוס: רגוע(בערך)';
 
   // Instructions fade out after 5 seconds (non-blocking)
   if (state === GameState.PLAYING){
@@ -1043,30 +1249,30 @@ function startLoopIfNeeded(){
 const OUTCOMES = {
   CAUGHT: [
     {
-      title: 'RINGS RETRIEVED',
-      text: 'Ofer tackles Mushu gently-ish. The rings are saved. Mushu pretends this was training. Tal screams “WHY ARE YOU SWEATY?”',
+      title: 'הטבעות ניצלו',
+      text: 'עופר תופס את מושו (בערך בעדינות). הטבעות נשמרות. מושו טוען שזה היה אימון. טל צועקת: "למה אתה מזיע?!"',
     },
     {
-      title: 'HEROIC GRAB',
-      text: 'You caught Mushu mid-zoom. He drops the rings and immediately demands snacks as legal compensation.',
+      title: 'תפיסה הירואית',
+      text: 'תפסתם את מושו באמצע זום. הוא מפיל את הטבעות ומיד דורש חטיפים כפיצוי חוקי.',
     },
     {
-      title: 'THE DOG ACCEPTS DEFEAT',
-      text: 'Mushu submits… by turning into a loaf. The rings are yours. The chaos remains.',
+      title: 'הכלב מקבל תבוסה',
+      text: 'מושו נכנע… בכך שהוא נהיה "לחמנייה". הטבעות אצלכם. הכאוס נשאר.',
     },
   ],
   TIME: [
     {
-      title: 'RINGS: GONE',
-      text: 'Time’s up. Mushu buried the rings “for safekeeping” (somewhere between dimensions). The wedding proceeds with two onion rings.',
+      title: 'הטבעות: נעלמו',
+      text: 'הזמן נגמר. מושו קבר את הטבעות "לשמירה" (איפשהו בין ממדים). החתונה ממשיכה עם שתי טבעות בצל.',
     },
     {
-      title: 'WEDDING SPEEDRUN FAIL',
-      text: 'The timer hits zero. Tal declares the rings “emotionally optional.” Mushu officiates. Everyone claps out of fear.',
+      title: 'ספידראן חתונה נכשל',
+      text: 'הטיימר מגיע לאפס. טל מכריזה שהטבעות "לא חובה רגשית". מושו עורך את הטקס. כולם מוחאים כפיים מפחד.',
     },
     {
-      title: 'COSMIC PAW CRIME',
-      text: 'Mushu escapes the arena. The rings are now a side quest. Ofer receives a consolation bouquet and a firm handshake.',
+      title: 'פשע כפות קוסמי',
+      text: 'מושו בורח מהזירה. הטבעות הופכות למשימת צד. עופר מקבל זר ניחומים ולחיצת יד תקיפה.',
     },
   ],
 };
@@ -1091,8 +1297,8 @@ function enterIdle(){
   setHidden(endUI, true);
   setHidden(rotateUI, true);
   instructionsEl.style.opacity = '0';
-  chaosEl.textContent = 'CHAOS: calm-ish';
-  timerEl.textContent = `${GAME_DURATION.toFixed(1)}s`;
+  chaosEl.textContent = 'כאוס: רגוע(בערך)';
+  timerEl.textContent = `${GAME_DURATION.toFixed(1)}ש׳`;
 }
 
 startBtn.addEventListener('click', async () => {

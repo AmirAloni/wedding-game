@@ -23,11 +23,10 @@
 html, body{
   height:100%;
   margin:0;
-  background:
-    radial-gradient(110% 85% at 50% 10%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 55%),
-    radial-gradient(110% 80% at 50% 20%, var(--lawn0) 0%, var(--lawn1) 45%, var(--lawn2) 100%);
+  background: linear-gradient(180deg, var(--lawn0) 0%, var(--lawn1) 55%, var(--lawn2) 100%);
   color: var(--ink);
   font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  direction: rtl;
   overscroll-behavior: none;
 }
 
@@ -47,9 +46,7 @@ canvas#game{
   width:100%;
   height:100%;
   display:block;
-  background:
-    radial-gradient(120% 80% at 50% 10%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 60%),
-    radial-gradient(120% 90% at 50% 30%, var(--lawn0) 0%, var(--lawn1) 55%, var(--lawn2) 100%);
+  background: linear-gradient(180deg, var(--lawn0) 0%, var(--lawn1) 55%, var(--lawn2) 100%);
 }
 
 /* Center the game area on larger screens (desktop/tablet). */
@@ -99,7 +96,7 @@ canvas#game{
 
 .title{
   font-weight: 900;
-  letter-spacing: .08em;
+  letter-spacing: 0;
   font-size: 22px;
   margin-bottom: 10px;
   text-align:center;
