@@ -142,6 +142,102 @@ canvas#game{
   text-align:center;
 }
 
+.howto{
+  margin: 12px 0 14px 0;
+  border: 1px solid rgba(18,49,28,.12);
+  background: rgba(255,250,243,.55);
+  border-radius: 14px;
+  padding: 10px 10px;
+  text-align: center;
+}
+
+.howtoTitle{
+  font-weight: 950;
+  font-size: 13px;
+  letter-spacing: .02em;
+  color: rgba(18,49,28,.90);
+  margin-bottom: 6px;
+}
+
+.howtoText{
+  color: rgba(18,49,28,.72);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.gesture{
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.gesturePhone{
+  position: relative;
+  width: clamp(190px, 68vw, 280px);
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(18,49,28,.14);
+  background:
+    radial-gradient(120% 100% at 20% 20%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 55%),
+    linear-gradient(135deg, rgba(255,210,231,.26), rgba(103,199,255,.14));
+  box-shadow: 0 10px 26px rgba(18,49,28,.08);
+  overflow: hidden;
+  --pad: 14px;
+  --inset: 18px; /* keep finger travel inside the square */
+  --dot: 26px;
+  --max: calc(100% - var(--inset) - var(--dot));
+  --min: var(--inset);
+}
+
+.gesturePhone::before{
+  content: "";
+  position: absolute;
+  inset: var(--pad);
+  border-radius: 12px;
+  border: 1px dashed rgba(18,49,28,.16);
+  opacity: .9;
+}
+
+.gestureFinger{
+  position: absolute;
+  top: var(--min);
+  left: var(--min);
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 999px;
+  background: rgba(255,250,243,.95);
+  border: 1px solid rgba(18,49,28,.16);
+  box-shadow: 0 10px 18px rgba(18,49,28,.12);
+  will-change: left, top;
+  animation: gestureSquareTour 6.4s ease-in-out infinite;
+}
+
+.gestureFinger::after{
+  content: "";
+  position: absolute;
+  inset: 4px 5px 6px 5px;
+  border-radius: 999px;
+  background: rgba(255,210,231,.55);
+}
+
+@keyframes gestureSquareTour{
+  /* Finger “wanders” inside the square (not on the border). */
+  0%   { left: var(--min); top: var(--min); opacity: .95; }
+  10%  { left: calc(50% - (var(--dot) / 2)); top: var(--min); opacity: .95; }
+  22%  { left: var(--max); top: calc(35% - (var(--dot) / 2)); opacity: .95; }
+  35%  { left: calc(60% - (var(--dot) / 2)); top: var(--max); opacity: .95; }
+  48%  { left: calc(35% - (var(--dot) / 2)); top: calc(60% - (var(--dot) / 2)); opacity: .95; }
+  62%  { left: var(--min); top: var(--max); opacity: .95; }
+  78%  { left: calc(50% - (var(--dot) / 2)); top: calc(50% - (var(--dot) / 2)); opacity: .95; }
+  100% { left: var(--min); top: var(--min); opacity: .95; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .gestureFinger{ animation: none; }
+}
+
 .isHidden{ display:none; }
 
 .hud{

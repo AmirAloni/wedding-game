@@ -16,27 +16,32 @@
         <div class="panel">
           <div class="title">כאוס חתונה</div>
           <div class="subtitle">תתפסו את מושו (🐶) לפני שהוא זורק את הטבעות לציר זמן אחר.</div>
+          <div class="howto" aria-label="איך משחקים">
+            <div class="howtoTitle">איך משחקים</div>
+            <div class="howtoText">
+              גוררים אצבע כדי להזיז את עופר 🤵<br />
+              תופסים את מושו 🐶 לפני שנגמר הזמן
+            </div>
+            <div class="gesture" aria-hidden="true">
+              <div class="gesturePhone">
+                <div class="gestureFinger"></div>
+              </div>
+            </div>
+          </div>
           <button id="startBtn" class="bigBtn" type="button">מתחילים כאוס</button>
           <div class="tiny">
-            מובייל בלבד • גוררים עם האצבע • מומלץ מצב לאורך
+            מובייל בלבד • מומלץ מצב לאורך
           </div>
         </div>
       </section>
 
-      <!-- PLAYING instructions (non-blocking, auto hides) -->
+      <!-- HUD (in-game UI) -->
       <div id="hud" class="hud" aria-label="תצוגת משחק">
         <div class="hudRow">
           <div id="timer" class="pill">30.0ש׳</div>
           <div id="chaos" class="pill pill--chaos">כאוס: רגוע(בערך)</div>
         </div>
         <div id="quip" class="quip" aria-live="polite"></div>
-        <div id="instructions" class="instructions">
-          גוררים את האצבע כדי לשלוט בעופר 🤵. תתפסו את מושו 🐶.
-          <br />
-          יש מכשולים: שולחנות, כיסאות, בר, רמקולים, עצים ושיחים — אי אפשר לעבור דרכם.
-          <br />
-          כל 5 שניות: כאוס אקראי לכמה שניות. הפיזיקה עלולה לשקר.
-        </div>
       </div>
 
       <!-- END UI -->

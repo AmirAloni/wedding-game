@@ -19,6 +19,27 @@ talStickerImg.decoding = 'async';
 talStickerImg.loading = 'eager';
 talStickerImg.src = 'Tal.webp';
 
+// Stage 1 (yard) props
+const palmTreeImg = new Image();
+palmTreeImg.decoding = 'async';
+palmTreeImg.loading = 'eager';
+palmTreeImg.src = 'palm-tree.webp';
+
+const treeImg = new Image();
+treeImg.decoding = 'async';
+treeImg.loading = 'eager';
+treeImg.src = 'tree.webp';
+
+const pinkBushImg = new Image();
+pinkBushImg.decoding = 'async';
+pinkBushImg.loading = 'eager';
+pinkBushImg.src = 'pink-bush.webp';
+
+const tableOutsideImg = new Image();
+tableOutsideImg.decoding = 'async';
+tableOutsideImg.loading = 'eager';
+tableOutsideImg.src = 'table-outside.webp';
+
 // =============================
 // Constants (tweak here)
 // =============================
@@ -222,6 +243,17 @@ function hideStageOverlay(){
   stageCountdownEl.textContent = '';
 }
 
+function startStageImmediately(stageIndex){
+  // No stage overlay / countdown: start gameplay immediately.
+  pendingStageIndex = stageIndex;
+  stageStartAt = 0;
+  countdownFromAt = 0;
+  hideStageOverlay();
+  resetGameToPlaying(stageIndex);
+  world.playEnabled = true;
+  if (stageIndex === 0) hasShownStage1HowTo = true;
+}
+
 function scheduleStageStart(stageIndex, { showHowTo }){
   pendingStageIndex = stageIndex;
   const cfg = getStageCfg(stageIndex);
@@ -286,6 +318,23 @@ function dist2(ax, ay, bx, by){
 }
 
 function nowSec(){ return performance.now() / 1000; }
+
+function isImgReady(img){
+  return !!(img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0);
+}
+
+function drawImgContain(g, img, cx, cy, maxW, maxH, anchor){
+  if (!isImgReady(img)) return false;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const s = Math.min(maxW / iw, maxH / ih);
+  const w = iw * s;
+  const h = ih * s;
+  const x = cx - w / 2;
+  const y = (anchor === 'bottom') ? (cy - h) : (cy - h / 2);
+  g.drawImage(img, x, y, w, h);
+  return true;
+}
 
 function setHidden(el, hidden){
   el.classList.toggle('isHidden', !!hidden);
@@ -1101,7 +1150,7 @@ function enterEnd(reason){
   setHidden(endUI, false);
   setHidden(startUI, true);
   setHidden(stageUI, true);
-  instructionsEl.style.opacity = '0';
+  if (instructionsEl) instructionsEl.style.opacity = '0';
   // Keep the last frame behind the overlay (no more simulation needed).
   // We still render one more time for "freeze-frame drama".
   render();
@@ -1499,9 +1548,12 @@ function update(dt){
 
     // Stage progression: stage 1/2 auto-advance, stage 3 ends run.
     if (world.stageIndex < STAGES.length - 1){
-      // Freeze moment, then show next stage overlay.
+      // Freeze moment, then start next stage (no overlay / countdown).
       world.playEnabled = false;
-      scheduleNextStage();
+      pendingStageIndex = world.stageIndex + 1;
+      stageStartAt = world.t + 0.7;
+      countdownFromAt = 0;
+      hideStageOverlay();
       setQuip('תפיסה הירואית. מושו: \"זה היה חימום\".', 1600);
     } else {
       enterEnd('ALL_CLEAR');
@@ -1569,7 +1621,25 @@ function render(){
 
   // Wedding props (obstacles)
   if (!obstacles.length) buildObstacles();
-  for (const o of obstacles){
+  const stageIndex = (world.stageIndex ?? 0);
+  let yardTreeIdx = 0;
+  for (let i = 0; i < obstacles.length; i++){
+    const o = obstacles[i];
+    // Stage 1 (yard): swap props to provided webp assets.
+    if (stageIndex === 0){
+      if (o.type === 'table'){
+        // Slightly larger than collision radius for readability.
+        if (drawImgContain(ctx, tableOutsideImg, o.x, o.y, o.r * 3.15, o.r * 3.15, 'center')) continue;
+      } else if (o.type === 'bush'){
+        // Slightly bottom-anchored so it "sits" on the lawn.
+        if (drawImgContain(ctx, pinkBushImg, o.x, o.y + o.r * 1.05, o.r * 2.65, o.r * 2.35, 'bottom')) continue;
+      } else if (o.type === 'tree'){
+        const img = (yardTreeIdx++ % 2 === 0) ? palmTreeImg : treeImg;
+        // Taller + wider so trees read better on mobile.
+        if (drawImgContain(ctx, img, o.x, o.y + o.r * 1.20, o.r * 3.45, o.r * 5.05, 'bottom')) continue;
+      }
+    }
+
     if (o.type === 'table'){
       // Table cloth
       ctx.fillStyle = 'rgba(255,250,243,.86)';
@@ -1781,7 +1851,7 @@ function render(){
   chaosEl.textContent = world.chaosActive ? `כאוס: ${world.chaosName}` : 'כאוס: רגוע(בערך)';
 
   // Instructions fade out after 5 seconds (non-blocking)
-  if (state === GameState.PLAYING){
+  if (state === GameState.PLAYING && instructionsEl){
     const remain = world.instructionsUntil - world.t;
     const alpha = clamp(remain / 1.0, 0, 1);
     instructionsEl.style.opacity = String(alpha);
@@ -1841,8 +1911,81 @@ function drawBody(b){
     ctx.stroke();
   }
 
+  // Stolen ring overlay: make it obvious Mushu has the rings.
+  if (b === mushu && mushu.hasRings){
+    drawStolenRingOnMushu(b);
+  }
+
   // Label
   drawLabel(b.label, b.x, b.y - b.r - 2);
+}
+
+function drawStolenRingOnMushu(b){
+  // Designed to sit near Mushu's mouth/paw regardless of sticker aspect.
+  const t = world.t || 0;
+  const bob = Math.sin(t * 10.5) * (b.r * 0.04);
+  // Bottom-left placement (looks like it's "held"/dragged).
+  const x = b.x - b.r * 0.66;
+  const y = b.y + b.r * 0.78 + bob;
+  const size = Math.max(8, b.r * 0.46);
+  const ang = 0.75 + Math.sin(t * 7.0) * 0.10;
+  drawRingIcon(x, y, size, ang);
+}
+
+function drawRingIcon(x, y, r, ang){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+
+  // Base ring (gold stroke)
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, r * 0.34);
+  ctx.strokeStyle = 'rgba(255,205,92,.98)';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inner shadow to fake thickness
+  ctx.lineWidth = Math.max(1.5, r * 0.20);
+  ctx.strokeStyle = 'rgba(160,106,26,.30)';
+  ctx.beginPath();
+  ctx.arc(r * 0.08, r * 0.12, r * 0.82, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Highlight
+  ctx.strokeStyle = 'rgba(255,255,255,.35)';
+  ctx.lineWidth = Math.max(1.2, r * 0.16);
+  ctx.beginPath();
+  ctx.arc(-r * 0.18, -r * 0.22, r * 0.86, -0.15 * Math.PI, 0.55 * Math.PI);
+  ctx.stroke();
+
+  // Simple "gem" on top
+  const gx = 0;
+  const gy = -r * 1.10;
+  ctx.fillStyle = 'rgba(255,210,231,.92)';
+  ctx.strokeStyle = 'rgba(255,250,243,.70)';
+  ctx.lineWidth = Math.max(1, r * 0.12);
+  ctx.beginPath();
+  ctx.moveTo(gx, gy - r * 0.24);
+  ctx.lineTo(gx + r * 0.26, gy);
+  ctx.lineTo(gx, gy + r * 0.24);
+  ctx.lineTo(gx - r * 0.26, gy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Tiny sparkle
+  ctx.strokeStyle = 'rgba(255,245,220,.75)';
+  ctx.lineWidth = Math.max(1, r * 0.10);
+  ctx.beginPath();
+  ctx.moveTo(r * 1.35, -r * 0.25);
+  ctx.lineTo(r * 1.55, -r * 0.45);
+  ctx.moveTo(r * 1.35, -r * 0.45);
+  ctx.lineTo(r * 1.55, -r * 0.25);
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 // =============================
@@ -1967,7 +2110,7 @@ function enterIdle(){
   setHidden(rotateUI, true);
   setHidden(stageUI, true);
   setQuip('');
-  instructionsEl.style.opacity = '0';
+  if (instructionsEl) instructionsEl.style.opacity = '0';
   chaosEl.textContent = 'כאוס: רגוע(בערך)';
   timerEl.textContent = `${DEFAULT_GAME_DURATION.toFixed(1)}ש׳`;
   world.playEnabled = false;
@@ -1980,11 +2123,11 @@ startBtn.addEventListener('click', async () => {
   await ensureAudioUnlocked();
   audio.sfx.start();
 
-  // Start stage run (stage 1 has fullscreen how-to once).
+  // Start immediately (no how-to overlay, no countdown).
   state = GameState.PLAYING;
   setHidden(startUI, true);
-  applyStageParams(getStageCfg(StageId.STAGE_1));
-  scheduleStageStart(StageId.STAGE_1, { showHowTo: !hasShownStage1HowTo });
+  hasShownStage1HowTo = true;
+  startStageImmediately(StageId.STAGE_1);
   startLoopIfNeeded();
 }, { passive: true });
 
@@ -1996,8 +2139,7 @@ restartBtn.addEventListener('click', async () => {
   const retryStage = world.endReason === 'TIME' ? world.stageIndex : StageId.STAGE_1;
   state = GameState.PLAYING;
   setHidden(endUI, true);
-  applyStageParams(getStageCfg(retryStage));
-  scheduleStageStart(retryStage, { showHowTo: false });
+  startStageImmediately(retryStage);
   startLoopIfNeeded();
 }, { passive: true });
 
