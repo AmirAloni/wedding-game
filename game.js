@@ -3,24 +3,38 @@
 */
 'use strict';
 
+// Local sticker asset (display only)
+const oferStickerImg = new Image();
+oferStickerImg.decoding = 'async';
+oferStickerImg.loading = 'eager';
+oferStickerImg.src = 'ofer.webp';
+
+const mushuStickerImg = new Image();
+mushuStickerImg.decoding = 'async';
+mushuStickerImg.loading = 'eager';
+mushuStickerImg.src = 'Mushu.webp';
+
+const talStickerImg = new Image();
+talStickerImg.decoding = 'async';
+talStickerImg.loading = 'eager';
+talStickerImg.src = 'Tal.webp';
+
 // =============================
 // Constants (tweak here)
 // =============================
-const GAME_DURATION = 30;       // seconds (how long you have to catch Mushu)
-const CHAOS_INTERVAL = 5;       // seconds (how often chaos triggers)
-const PLAYER_SPEED = 1250;      // "oomph" for Ofer (higher = snappier, easier)
+const DEFAULT_GAME_DURATION = 30; // seconds (fallback)
 
 // How to tweak chaos:
 // - Change CHAOS_EVENT_MIN_MS / CHAOS_EVENT_MAX_MS to make chaos shorter/longer.
 // - Change CHAOS_WEIGHTS to bias which events happen more.
-const CHAOS_EVENT_MIN_MS = 4000;
-const CHAOS_EVENT_MAX_MS = 4000;
+const DEFAULT_CHAOS_EVENT_MIN_MS = 4000;
+const DEFAULT_CHAOS_EVENT_MAX_MS = 4000;
 
 // How to adjust difficulty:
 // - Increase PLAYER_SPEED to make catching easier.
 // - Increase MUSHU_BASE_SPEED to make Mushu harder.
 // - Increase ARENA_MARGIN to reduce playable area (harder).
-const MUSHU_BASE_SPEED = 330;
+const DEFAULT_MUSHU_BASE_SPEED = 330;
 const ARENA_MARGIN = 18;
 
 // How to change text:
@@ -32,12 +46,13 @@ const ARENA_MARGIN = 18;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 
-// Cached background for the canvas (rebuilt on resize).
+// Cached background for the canvas (rebuilt on resize / stage change).
 let bgCache = null;
 
 const startUI = document.getElementById('startUI');
 const endUI = document.getElementById('endUI');
 const rotateUI = document.getElementById('rotateUI');
+const stageUI = document.getElementById('stageUI');
 
 const startBtn = document.getElementById('startBtn');
 const restartBtn = document.getElementById('restartBtn');
@@ -45,8 +60,13 @@ const restartBtn = document.getElementById('restartBtn');
 const timerEl = document.getElementById('timer');
 const chaosEl = document.getElementById('chaos');
 const instructionsEl = document.getElementById('instructions');
+const quipEl = document.getElementById('quip');
 const endTitleEl = document.getElementById('endTitle');
 const endTextEl = document.getElementById('endText');
+const stageTitleEl = document.getElementById('stageTitle');
+const stageTextEl = document.getElementById('stageText');
+const stageCountdownEl = document.getElementById('stageCountdown');
+const stageTinyEl = document.getElementById('stageTiny');
 
 // =============================
 // State machine (MANDATORY)
@@ -60,6 +80,198 @@ const GameState = Object.freeze({
 
 let state = GameState.IDLE;
 let rafId = 0;
+
+// =============================
+// Stage system (3 stages, sequential)
+// =============================
+const StageId = Object.freeze({
+  STAGE_1: 0,
+  STAGE_2: 1,
+  STAGE_3: 2,
+});
+
+function stageNum(i){ return i + 1; }
+
+const STAGES = [
+  {
+    name: 'מי נגע בטבעות?!',
+    place: 'בחצר',
+    punch: 'תוכיח שאתה לא רק חתן בתמונות.',
+    howTo: [
+      'גוררים אצבע = עופר 🤵 זז כמו מגנט על סקטבורד.',
+      'המטרה: לתפוס את מושו 🐶 לפני שהטיימר נגמר.',
+      'שולחנות/כיסאות/עצים/שיחים: לא עוברים דרכם. כן, זה אישי.',
+      'כל כמה שניות יש \"כאוס\" קטן. הפיזיקה עלולה לשקר.',
+    ].join('\n'),
+    // Difficulty
+    durationSec: 30,
+    playerSpeed: 1450,
+    mushuBaseSpeed: 290,
+    chaosIntervalSec: 6.0,
+    chaosEventMinMs: 3200,
+    chaosEventMaxMs: 3600,
+    chaosWeights: null, // filled after ChaosEvent declared
+    mushuBoostRange: [1.35, 1.75],
+    shakeIntensity: 0.65,
+    brideRageEnabled: false,
+    brideRageDurFactor: 0,
+    talRage: {
+      targetR: 24,
+      alongK: 5.8,
+      sideK: 9.5,
+      maxAccel: 1500,
+      wind: 220,
+    },
+  },
+  {
+    name: 'טל גילתה',
+    place: 'באולם',
+    punch: 'זה לא טריאתלון. זה אירוע.',
+    intro: 'טל כבר רואה הכל. במיוחד זיעה.',
+    durationSec: 30,
+    playerSpeed: 1320,
+    mushuBaseSpeed: 330,
+    chaosIntervalSec: 5.0,
+    chaosEventMinMs: 3800,
+    chaosEventMaxMs: 4200,
+    chaosWeights: null,
+    mushuBoostRange: [1.55, 2.05],
+    shakeIntensity: 1.0,
+    brideRageEnabled: true,
+    brideRageDurFactor: 0.8,
+    talRage: {
+      targetR: 28,
+      alongK: 7.0,
+      sideK: 12.0,
+      maxAccel: 1800,
+      wind: 280,
+    },
+  },
+  {
+    name: 'מושו נכנס למוד סופ״ש',
+    place: 'בחופה',
+    punch: 'כולם צועקים \"רק עוד תמונה\" והוא בורח.',
+    intro: 'זה השלב שבו מושו נהיה קטן-חמוד-חסין-לחוקים.',
+    durationSec: 30,
+    playerSpeed: 1220,
+    mushuBaseSpeed: 385,
+    chaosIntervalSec: 4.5,
+    chaosEventMinMs: 4200,
+    chaosEventMaxMs: 4800,
+    chaosWeights: null,
+    mushuBoostRange: [1.75, 2.35],
+    shakeIntensity: 1.25,
+    brideRageEnabled: true,
+    brideRageDurFactor: 1.05,
+    talRage: {
+      targetR: 32,
+      alongK: 7.6,
+      sideK: 13.8,
+      maxAccel: 1950,
+      wind: 340,
+    },
+  },
+];
+
+let hasShownStage1HowTo = false;
+let pendingStageIndex = StageId.STAGE_1;
+let stageStartAt = 0;
+let countdownFromAt = 0;
+let overlayMode = 'none'; // 'howto' | 'intro' | 'between' | 'none'
+
+function getStageCfg(i){
+  return STAGES[clamp(i, 0, STAGES.length - 1)];
+}
+
+function setQuip(text, ms){
+  if (!quipEl) return;
+  if (!text){
+    quipEl.textContent = '';
+    quipEl.classList.remove('isOn');
+    return;
+  }
+  quipEl.textContent = text;
+  quipEl.classList.add('isOn');
+  const until = performance.now() + (ms ?? 1400);
+  // Lightweight timeout; no state change outside DOM.
+  setTimeout(() => {
+    if (performance.now() >= until - 5) quipEl.classList.remove('isOn');
+  }, (ms ?? 1400));
+}
+
+function showStageOverlay(cfg, mode){
+  overlayMode = mode;
+  setHidden(stageUI, false);
+  stageTitleEl.textContent = `שלב ${stageNum(pendingStageIndex)} (${cfg.place || 'איפשהו'}): ${cfg.name}`;
+  if (mode === 'howto'){
+    stageTextEl.textContent = cfg.howTo;
+    stageTinyEl.textContent = 'עוד רגע זה מתחיל. אל תנסה להתווכח עם כיסאות.';
+  } else if (mode === 'between'){
+    stageTextEl.textContent = `שלב ${stageNum(pendingStageIndex - 1)} הושלם.\n${cfg.intro || cfg.punch}`;
+    stageTinyEl.textContent = 'נושמים. ממשיכים. לא מספרים לדוד.';
+  } else {
+    stageTextEl.textContent = `${cfg.intro || ''}\n${cfg.punch}`.trim();
+    stageTinyEl.textContent = 'תזכור: לנצח זה אופציונלי. קומדיה זה חובה.';
+  }
+  stageCountdownEl.textContent = '';
+}
+
+function hideStageOverlay(){
+  overlayMode = 'none';
+  setHidden(stageUI, true);
+  stageCountdownEl.textContent = '';
+}
+
+function scheduleStageStart(stageIndex, { showHowTo }){
+  pendingStageIndex = stageIndex;
+  const cfg = getStageCfg(stageIndex);
+
+  // Show overlay and schedule start.
+  const t = nowSec();
+  const totalDelay = showHowTo ? 5.0 : 3.0; // includes countdown
+  stageStartAt = t + totalDelay;
+  countdownFromAt = stageStartAt - 3.0;
+
+  showStageOverlay(cfg, showHowTo ? 'howto' : 'intro');
+  world.playEnabled = false;
+  world.stageIndex = stageIndex;
+  world.timeLeft = cfg.durationSec;
+  world.chaosActive = false;
+  world.chaosName = 'רגוע(בערך)';
+  world.shakeUntil = 0;
+  clearChaosEffects();
+}
+
+function scheduleNextStage(){
+  const next = world.stageIndex + 1;
+  if (next >= STAGES.length) return;
+  pendingStageIndex = next;
+  const cfg = getStageCfg(next);
+  const t = nowSec();
+  stageStartAt = t + 3.0;
+  countdownFromAt = stageStartAt - 3.0;
+  showStageOverlay(cfg, 'between');
+  world.playEnabled = false;
+  world.timeLeft = cfg.durationSec;
+  clearChaosEffects();
+}
+
+function applyStageParams(cfg){
+  world.params = {
+    durationSec: cfg.durationSec ?? DEFAULT_GAME_DURATION,
+    playerSpeed: cfg.playerSpeed ?? 1250,
+    mushuBaseSpeed: cfg.mushuBaseSpeed ?? DEFAULT_MUSHU_BASE_SPEED,
+    chaosIntervalSec: cfg.chaosIntervalSec ?? 5,
+    chaosEventMinMs: cfg.chaosEventMinMs ?? DEFAULT_CHAOS_EVENT_MIN_MS,
+    chaosEventMaxMs: cfg.chaosEventMaxMs ?? DEFAULT_CHAOS_EVENT_MAX_MS,
+    chaosWeights: cfg.chaosWeights,
+    mushuBoostRange: cfg.mushuBoostRange ?? [1.6, 2.3],
+    shakeIntensity: cfg.shakeIntensity ?? 1.0,
+    brideRageEnabled: !!cfg.brideRageEnabled,
+    brideRageDurFactor: cfg.brideRageDurFactor ?? 1.0,
+    talRage: cfg.talRage,
+  };
+}
 
 // =============================
 // Utility
@@ -104,43 +316,138 @@ function buildBackgroundCache(){
   const w = canvas.width, h = canvas.height;
   if (!w || !h) return;
 
+  const stage = clamp(world.stageIndex ?? 0, 0, STAGES.length - 1);
+
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const g = c.getContext('2d', { alpha: false });
 
-  // Lawn gradient.
-  const lawn = g.createRadialGradient(
-    w * 0.52,
-    h * 0.18,
-    Math.min(w, h) * 0.08,
-    w * 0.52,
-    h * 0.55,
-    Math.max(w, h) * 0.95
-  );
-  lawn.addColorStop(0, '#c3f07a');
-  lawn.addColorStop(0.45, '#7bd77f');
-  lawn.addColorStop(1, '#2f8d52');
-  g.fillStyle = lawn;
-  g.fillRect(0, 0, w, h);
+  if (stage === 1){
+    // Indoor hall: keep the TOP clean, put the dance floor up top near the bar.
+    const wall = g.createLinearGradient(0, 0, 0, h);
+    wall.addColorStop(0, '#2b2a2f');
+    wall.addColorStop(0.32, '#34333c');
+    wall.addColorStop(0.62, '#1e1e24');
+    wall.addColorStop(1, '#121216');
+    g.fillStyle = wall;
+    g.fillRect(0, 0, w, h);
 
-  // Soft vignette for depth.
-  const vig = g.createRadialGradient(
-    w * 0.5,
-    h * 0.35,
-    Math.min(w, h) * 0.2,
-    w * 0.5,
-    h * 0.35,
-    Math.max(w, h) * 0.85
-  );
-  vig.addColorStop(0, 'rgba(255,255,255,0)');
-  vig.addColorStop(1, 'rgba(18,49,28,0.18)');
-  g.fillStyle = vig;
-  g.fillRect(0, 0, w, h);
+    // Soft vignette for depth (clean, no extra decorations up top).
+    const vig = g.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.10, w * 0.5, h * 0.45, Math.max(w, h) * 0.95);
+    vig.addColorStop(0, 'rgba(255,255,255,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.42)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, w, h);
 
-  // Keep background clean: no decorative ellipses/circles over the lawn.
+    // Dance floor (checkered) near the top area.
+    const dfX = clamp(w * 0.18, 20, w - 20);
+    const dfY = clamp(h * 0.22, 20, h - 20);
+    const dfW = clamp(w * 0.64, 220, w - dfX - 20);
+    const dfH = clamp(h * 0.34, 220, h - dfY - 20);
+    drawRoundedRect(g, dfX, dfY, dfW, dfH, 22, 'rgba(255,250,243,0.07)', 'rgba(255,123,184,0.24)');
 
-  bgCache = { w, h, c };
+    function hash2(ix, iy){
+      // Deterministic tiny hash (no randomness in cached background).
+      let n = (ix * 374761393) ^ (iy * 668265263);
+      n = (n ^ (n >>> 13)) * 1274126177;
+      return (n ^ (n >>> 16)) >>> 0;
+    }
+
+    const tile = clamp(Math.round(Math.min(w, h) * 0.075), 26, 46);
+    const dfTile = clamp(Math.round(tile * 0.9), 22, 44);
+    const palette = [
+      'rgba(255,250,243,0.20)', // ivory
+      'rgba(233,238,241,0.20)', // stone
+      'rgba(255,210,231,0.18)', // blush
+      'rgba(103,199,255,0.16)', // cyan
+    ];
+    for (let y = dfY + 8; y < dfY + dfH - 8; y += dfTile){
+      for (let x = dfX + 8; x < dfX + dfW - 8; x += dfTile){
+        const ix = ((x - dfX) / dfTile) | 0;
+        const iy = ((y - dfY) / dfTile) | 0;
+        const n = hash2(ix, iy);
+        const odd = (ix + iy) % 2;
+        const c0 = palette[n % palette.length];
+        const c1 = odd ? 'rgba(255,123,184,0.12)' : 'rgba(103,199,255,0.10)';
+        g.fillStyle = n % 5 === 0 ? c0 : c1;
+        g.fillRect(x, y, dfTile - 1, dfTile - 1);
+      }
+    }
+
+    // Glow on the dance floor edges.
+    g.strokeStyle = 'rgba(255,233,190,0.18)';
+    g.lineWidth = 4;
+    g.strokeRect(dfX + 8, dfY + 8, dfW - 16, dfH - 16);
+
+    // Warm spotlight center.
+    const spot = g.createRadialGradient(w * 0.52, h * 0.34, Math.min(w, h) * 0.06, w * 0.52, h * 0.62, Math.max(w, h) * 0.82);
+    spot.addColorStop(0, 'rgba(255,233,190,0.22)');
+    spot.addColorStop(0.35, 'rgba(255,233,190,0.10)');
+    spot.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = spot;
+    g.fillRect(0, 0, w, h);
+  } else if (stage === 2){
+    // Under the chuppah: blush fabric close-up.
+    const cloth = g.createLinearGradient(0, 0, 0, h);
+    cloth.addColorStop(0, '#fff3f8');
+    cloth.addColorStop(0.42, '#ffd2e7');
+    cloth.addColorStop(1, '#e9eef1');
+    g.fillStyle = cloth;
+    g.fillRect(0, 0, w, h);
+
+    // Fabric stripes.
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    for (let i = -3; i < 10; i++){
+      const x = (i * w) / 8;
+      g.save();
+      g.translate(x, 0);
+      g.rotate(-0.12);
+      g.fillRect(0, -h * 0.2, w * 0.12, h * 1.6);
+      g.restore();
+    }
+
+    // Soft floral corners.
+    drawBed(g, w * 0.14, h * 0.22, Math.min(w, h) * 0.16, Math.min(w, h) * 0.11);
+    drawBed(g, w * 0.86, h * 0.24, Math.min(w, h) * 0.16, Math.min(w, h) * 0.11);
+
+    const vig = g.createRadialGradient(w * 0.5, h * 0.5, Math.min(w, h) * 0.18, w * 0.5, h * 0.5, Math.max(w, h) * 0.88);
+    vig.addColorStop(0, 'rgba(255,255,255,0)');
+    vig.addColorStop(1, 'rgba(18,49,28,0.12)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, w, h);
+  } else {
+    // Yard: lawn gradient.
+    const lawn = g.createRadialGradient(
+      w * 0.52,
+      h * 0.18,
+      Math.min(w, h) * 0.08,
+      w * 0.52,
+      h * 0.55,
+      Math.max(w, h) * 0.95
+    );
+    lawn.addColorStop(0, '#c3f07a');
+    lawn.addColorStop(0.45, '#7bd77f');
+    lawn.addColorStop(1, '#2f8d52');
+    g.fillStyle = lawn;
+    g.fillRect(0, 0, w, h);
+
+    // Soft vignette for depth.
+    const vig = g.createRadialGradient(
+      w * 0.5,
+      h * 0.35,
+      Math.min(w, h) * 0.2,
+      w * 0.5,
+      h * 0.35,
+      Math.max(w, h) * 0.85
+    );
+    vig.addColorStop(0, 'rgba(255,255,255,0)');
+    vig.addColorStop(1, 'rgba(18,49,28,0.18)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, w, h);
+  }
+
+  bgCache = { w, h, stage, c };
 }
 
 function drawRoundedRect(g, x, y, w, h, r, fill, stroke){
@@ -254,6 +561,7 @@ function canvasPointFromTouch(t){
 function onTouchStart(e){
   if (state === GameState.IDLE) return; // ignore; UI handles start
   if (state === GameState.END) return;  // overlay handles restart
+  if (!world.playEnabled) return;       // stage intro / between stages
   const t = e.changedTouches[0];
   input.active = true;
   input.id = t.identifier;
@@ -375,8 +683,12 @@ const world = {
   w: 0,
   h: 0,
 
-  timeLeft: GAME_DURATION,
-  chaosCountdown: CHAOS_INTERVAL,
+  stageIndex: StageId.STAGE_1,
+  params: null,
+  playEnabled: false,
+
+  timeLeft: DEFAULT_GAME_DURATION,
+  chaosCountdown: 5,
   chaosActive: false,
   chaosName: 'רגוע(בערך)',
   chaosUntil: 0,
@@ -435,51 +747,151 @@ function buildObstacles(){
   const top = m;
   const bottom = h - m;
 
-  // Chuppah near the top center.
-  const chW = clamp(w * 0.46, 190, 280);
-  const chH = clamp(h * 0.12, 84, 128);
-  const chX = clamp(w * 0.5 - chW / 2, left, right - chW);
-  const chY = clamp(top + h * 0.07, top, bottom - chH);
-  obstacles.push({
-    kind: 'rect',
-    type: 'chuppah',
-    x: chX,
-    y: chY,
-    w: chW,
-    h: chH,
-    r: 16,
-  });
+  const stage = clamp(world.stageIndex ?? 0, 0, STAGES.length - 1);
 
-  // Tables + chairs in the middle-ish area.
   const tableR = clamp(Math.min(w, h) * 0.055, 34, 52);
-  const tableY = clamp(h * 0.60, top + chH + 70, bottom - tableR - 40);
-  const tableX1 = clamp(w * 0.28, left + tableR + 30, right - tableR - 30);
-  const tableX2 = clamp(w * 0.72, left + tableR + 30, right - tableR - 30);
+  const chairR = clamp(tableR * 0.42, 14, 22);
 
-  const tables = [
-    { x: tableX1, y: tableY },
-    { x: tableX2, y: tableY + clamp(h * 0.02, -18, 18) },
-  ];
+  function addChuppah(nx, ny, nW, nH){
+    const chW = clamp(w * nW, 170, 300);
+    const chH = clamp(h * nH, 78, 138);
+    const chX = clamp(w * nx - chW / 2, left, right - chW);
+    const chY = clamp(top + h * ny, top, bottom - chH);
+    obstacles.push({ kind: 'rect', type: 'chuppah', x: chX, y: chY, w: chW, h: chH, r: 16 });
+    return { chH, chY };
+  }
 
-  for (const t of tables){
-    obstacles.push({ kind: 'circle', type: 'table', x: t.x, y: t.y, r: tableR });
-
-    const chairR = clamp(tableR * 0.42, 14, 22);
+  function addTableWithChairs(x, y, chairCount){
+    obstacles.push({ kind: 'circle', type: 'table', x, y, r: tableR });
+    if (!chairCount || chairCount <= 0) return;
     const ring = tableR + chairR + 10;
-    const chairAngles = [
-      0,
-      Math.PI / 3,
-      (2 * Math.PI) / 3,
-      Math.PI,
-      (4 * Math.PI) / 3,
-      (5 * Math.PI) / 3,
-    ];
-    for (const a of chairAngles){
-      const cx = t.x + Math.cos(a) * ring;
-      const cy = t.y + Math.sin(a) * ring;
+    const angles = [];
+    for (let i = 0; i < chairCount; i++){
+      angles.push((i / chairCount) * Math.PI * 2);
+    }
+    for (const a of angles){
+      const cx = x + Math.cos(a) * ring;
+      const cy = y + Math.sin(a) * ring;
       if (cx < left + chairR || cx > right - chairR || cy < top + chairR || cy > bottom - chairR) continue;
       obstacles.push({ kind: 'circle', type: 'chair', x: cx, y: cy, r: chairR });
     }
+  }
+
+  function addFountain(nx, ny){
+    const r = clamp(Math.min(w, h) * 0.065, 36, 62);
+    const x = clamp(w * nx, left + r, right - r);
+    const y = clamp(h * ny, top + r, bottom - r);
+    obstacles.push({ kind: 'circle', type: 'fountain', x, y, r });
+  }
+
+  function addFlowerBed(nx, ny){
+    const r = clamp(Math.min(w, h) * 0.055, 30, 54);
+    const x = clamp(w * nx, left + r, right - r);
+    const y = clamp(h * ny, top + r, bottom - r);
+    obstacles.push({ kind: 'circle', type: 'bed', x, y, r });
+  }
+
+  function addTree(nx, ny, nr){
+    const r = clamp(Math.min(w, h) * nr, 24, 46);
+    const x = clamp(w * nx, left + r, right - r);
+    const y = clamp(h * ny, top + r, bottom - r);
+    obstacles.push({ kind: 'circle', type: 'tree', x, y, r });
+  }
+
+  function addBush(nx, ny, nr){
+    const r = clamp(Math.min(w, h) * nr, 18, 36);
+    const x = clamp(w * nx, left + r, right - r);
+    const y = clamp(h * ny, top + r, bottom - r);
+    obstacles.push({ kind: 'circle', type: 'bush', x, y, r });
+  }
+
+  function addFlowerPatch(nx, ny, nr){
+    const r = clamp(Math.min(w, h) * nr, 14, 28);
+    const x = clamp(w * nx, left + r, right - r);
+    const y = clamp(h * ny, top + r, bottom - r);
+    // Decorative only: drawn but NOT a collision obstacle.
+    obstacles.push({ kind: 'circle', type: 'flowers', x, y, r, solid: false });
+  }
+
+  function addBuffet(nx, ny, nW, nH){
+    const bw = clamp(w * nW, 160, 320);
+    const bh = clamp(h * nH, 58, 110);
+    const x = clamp(w * nx - bw / 2, left, right - bw);
+    const y = clamp(h * ny, top, bottom - bh);
+    obstacles.push({ kind: 'rect', type: 'buffet', x, y, w: bw, h: bh, r: 18 });
+  }
+
+  function addBar(nx, ny, nW, nH){
+    const bw = clamp(w * nW, 180, 360);
+    const bh = clamp(h * nH, 62, 120);
+    const x = clamp(w * nx - bw / 2, left, right - bw);
+    const y = clamp(h * ny, top, bottom - bh);
+    obstacles.push({ kind: 'rect', type: 'bar', x, y, w: bw, h: bh, r: 18 });
+  }
+
+  function addSpeaker(nx, ny, nW, nH){
+    const sw = clamp(w * nW, 48, 86);
+    const sh = clamp(h * nH, 86, 132);
+    const x = clamp(w * nx - sw / 2, left, right - sw);
+    const y = clamp(h * ny - sh / 2, top, bottom - sh);
+    obstacles.push({ kind: 'rect', type: 'speaker', x, y, w: sw, h: sh, r: 16 });
+  }
+
+  function addPole(nx, ny){
+    const r = clamp(Math.min(w, h) * 0.026, 12, 18);
+    const x = clamp(w * nx, left + r, right - r);
+    const y = clamp(h * ny, top + r, bottom - r);
+    obstacles.push({ kind: 'circle', type: 'pole', x, y, r });
+  }
+
+  // Stage-specific layouts (yard / hall / under the chuppah)
+  if (stage === 0){
+    // Yard: no chuppah, no bed. Add garden props.
+    addTableWithChairs(
+      clamp(w * 0.30, left + tableR + 18, right - tableR - 18),
+      clamp(h * 0.66, top + 150, bottom - tableR - 28),
+      0
+    );
+    addTableWithChairs(
+      clamp(w * 0.74, left + tableR + 18, right - tableR - 18),
+      clamp(h * 0.58, top + 140, bottom - tableR - 28),
+      0
+    );
+
+    // Trees & bushes are solid (obstacles).
+    addTree(0.14, 0.26, 0.055);
+    addTree(0.86, 0.26, 0.055);
+    addTree(0.12, 0.82, 0.060);
+    addTree(0.88, 0.80, 0.060);
+
+    addBush(0.28, 0.46, 0.040);
+    addBush(0.72, 0.44, 0.040);
+    addBush(0.18, 0.60, 0.036);
+    addBush(0.82, 0.62, 0.036);
+  } else if (stage === 1){
+    // Hall: clean top area; bar + speakers + dance floor are up top.
+    addBar(0.50, 0.12, 0.62, 0.11);
+    addSpeaker(0.28, 0.30, 0.11, 0.17);
+    addSpeaker(0.72, 0.30, 0.11, 0.17);
+
+    // Tables moved lower to keep the top clear.
+    addTableWithChairs(clamp(w * 0.22, left + tableR + 18, right - tableR - 18), clamp(h * 0.70, top + 190, bottom - tableR - 18), 6);
+    addTableWithChairs(clamp(w * 0.78, left + tableR + 18, right - tableR - 18), clamp(h * 0.76, top + 210, bottom - tableR - 18), 6);
+    addTableWithChairs(clamp(w * 0.26, left + tableR + 18, right - tableR - 18), clamp(h * 0.88, top + 260, bottom - tableR - 18), 5);
+    addTableWithChairs(clamp(w * 0.74, left + tableR + 18, right - tableR - 18), clamp(h * 0.90, top + 270, bottom - tableR - 18), 5);
+
+    // A couple of stray chairs (still obstacles) but not in the top area.
+    obstacles.push({ kind: 'circle', type: 'chair', x: clamp(w * 0.44, left + chairR, right - chairR), y: clamp(h * 0.52, top + chairR, bottom - chairR), r: chairR });
+    obstacles.push({ kind: 'circle', type: 'chair', x: clamp(w * 0.56, left + chairR, right - chairR), y: clamp(h * 0.54, top + chairR, bottom - chairR), r: chairR });
+  } else {
+    // Under the chuppah: giant canopy + poles, minimal clutter.
+    addChuppah(0.50, 0.14, 0.72, 0.20);
+    addPole(0.20, 0.26);
+    addPole(0.80, 0.26);
+    addPole(0.24, 0.58);
+    addPole(0.76, 0.58);
+    // "Ring stand" (fountain) as a comedic hazard.
+    addFountain(0.50, 0.56);
   }
 }
 
@@ -574,6 +986,7 @@ function resolveCircleVsRectObstacle(body, o){
 function resolveBodyVsObstacles(body){
   let hit = false;
   for (const o of obstacles){
+    if (o.solid === false) continue;
     if (o.kind === 'circle') hit = resolveCircleVsCircleObstacle(body, o) || hit;
     else hit = resolveCircleVsRectObstacle(body, o) || hit;
   }
@@ -606,19 +1019,22 @@ function spawnConfetti(n, x, y, strength){
   }
 }
 
-function resetGameToPlaying(){
+function resetGameToPlaying(stageIndex){
+  world.stageIndex = clamp(stageIndex ?? world.stageIndex ?? 0, 0, STAGES.length - 1);
+  const cfg = getStageCfg(world.stageIndex);
+  applyStageParams(cfg);
   resizeCanvas();
   syncWorldToCanvasSize();
   const w = world.w, h = world.h;
   world.t = nowSec();
   world.lastT = world.t;
   world.dt = 0;
-  world.timeLeft = GAME_DURATION;
-  world.chaosCountdown = CHAOS_INTERVAL;
+  world.timeLeft = world.params?.durationSec ?? (cfg.durationSec ?? DEFAULT_GAME_DURATION);
+  world.chaosCountdown = world.params?.chaosIntervalSec ?? 5;
   world.chaosActive = false;
   world.chaosName = 'רגוע(בערך)';
   world.chaosUntil = 0;
-  world.instructionsUntil = world.t + 5;
+  world.instructionsUntil = world.t + (world.stageIndex === 0 ? 6 : 4);
   world.shakeUntil = 0;
   world.mushuBoost = 1;
   world.brideRage = false;
@@ -627,18 +1043,37 @@ function resetGameToPlaying(){
 
   // Start positions (portrait-ish)
   // Keep initial action closer to screen center (less "spawn at bottom / ceiling").
-  ofer.x = w * 0.5; ofer.y = h * 0.70;
+  if (world.stageIndex === 0){
+    ofer.x = w * 0.48; ofer.y = h * 0.74;
+  } else if (world.stageIndex === 1){
+    ofer.x = w * 0.50; ofer.y = h * 0.70;
+  } else {
+    ofer.x = w * 0.62; ofer.y = h * 0.76;
+  }
   ofer.vx = 0; ofer.vy = 0;
 
-  mushu.x = w * 0.5; mushu.y = h * 0.40;
+  if (world.stageIndex === 0){
+    mushu.x = w * 0.52; mushu.y = h * 0.44;
+  } else if (world.stageIndex === 1){
+    mushu.x = w * 0.50; mushu.y = h * 0.40;
+  } else {
+    mushu.x = w * 0.34; mushu.y = h * 0.36;
+  }
   mushu.vx = rand(-120, 120); mushu.vy = rand(-60, 60);
   mushu.hasRings = true;
   mushu.mood = rand(0, 1000);
   mushu.zigUntil = 0;
 
-  tal.x = w * 0.16; tal.y = h * 0.18;
+  // Stage 1 should be Tal-free (no visual, no collisions).
+  tal.visible = (world.stageIndex !== 0);
+  if (world.stageIndex === 0){
+    tal.x = w * 0.14; tal.y = h * 0.20;
+  } else if (world.stageIndex === 1){
+    tal.x = w * 0.16; tal.y = h * 0.18;
+  } else {
+    tal.x = w * 0.84; tal.y = h * 0.22;
+  }
   tal.vx = 110; tal.vy = 30;
-  tal.visible = true;
 
   // Ensure spawns are always inside the playable arena (important after mobile viewport resizes).
   clampBodyToArena(ofer);
@@ -656,13 +1091,16 @@ function resetGameToPlaying(){
   state = GameState.PLAYING;
   setHidden(endUI, true);
   setHidden(startUI, true);
+  setHidden(stageUI, true);
 }
 
 function enterEnd(reason){
   state = GameState.END;
+  world.playEnabled = false;
   world.endReason = reason;
   setHidden(endUI, false);
   setHidden(startUI, true);
+  setHidden(stageUI, true);
   instructionsEl.style.opacity = '0';
   // Keep the last frame behind the overlay (no more simulation needed).
   // We still render one more time for "freeze-frame drama".
@@ -680,10 +1118,27 @@ const ChaosEvent = Object.freeze({
 });
 
 // Bias: more goofy camera + controls.
-const CHAOS_WEIGHTS = [
+const DEFAULT_CHAOS_WEIGHTS = [
   [ChaosEvent.MUSHU_BOOST, 1.1],
   [ChaosEvent.SCREEN_SHAKE, 1.25],
   [ChaosEvent.BRIDE_RAGE, 1.15],
+];
+
+// Fill stage weights now that ChaosEvent exists.
+STAGES[0].chaosWeights = [
+  [ChaosEvent.MUSHU_BOOST, 1.45],
+  [ChaosEvent.SCREEN_SHAKE, 0.95],
+  // No bride rage in stage 1 (easy).
+];
+STAGES[1].chaosWeights = [
+  [ChaosEvent.MUSHU_BOOST, 1.35],
+  [ChaosEvent.SCREEN_SHAKE, 1.0],
+  [ChaosEvent.BRIDE_RAGE, 1.05],
+];
+STAGES[2].chaosWeights = [
+  [ChaosEvent.MUSHU_BOOST, 1.35],
+  [ChaosEvent.SCREEN_SHAKE, 1.25],
+  [ChaosEvent.BRIDE_RAGE, 1.25],
 ];
 
 function pickWeighted(weights){
@@ -707,7 +1162,9 @@ function clearChaosEffects(){
 
 function startChaosEvent(name){
   const t = world.t;
-  const dur = rand(CHAOS_EVENT_MIN_MS, CHAOS_EVENT_MAX_MS) / 1000;
+  const p = world.params || {};
+  const durBase = rand(p.chaosEventMinMs ?? DEFAULT_CHAOS_EVENT_MIN_MS, p.chaosEventMaxMs ?? DEFAULT_CHAOS_EVENT_MAX_MS) / 1000;
+  const dur = (name === ChaosEvent.BRIDE_RAGE) ? (durBase * (p.brideRageDurFactor ?? 1.0)) : durBase;
   world.chaosActive = true;
   world.chaosName = name;
   world.chaosUntil = t + dur;
@@ -720,7 +1177,11 @@ function startChaosEvent(name){
 
   switch (name){
     case ChaosEvent.MUSHU_BOOST:
-      world.mushuBoost = rand(1.6, 2.3);
+      {
+        const r0 = (p.mushuBoostRange?.[0] ?? 1.6);
+        const r1 = (p.mushuBoostRange?.[1] ?? 2.3);
+        world.mushuBoost = rand(Math.min(r0, r1), Math.max(r0, r1));
+      }
       mushu.vx *= rand(1.05, 1.25);
       mushu.vy *= rand(1.05, 1.25);
       break;
@@ -728,7 +1189,12 @@ function startChaosEvent(name){
       world.shakeUntil = t + dur;
       break;
     case ChaosEvent.BRIDE_RAGE:
-      world.brideRage = true;
+      if (p.brideRageEnabled){
+        world.brideRage = true;
+      } else {
+        // If bride rage is disabled for this stage, fall back to a harmless shake.
+        world.shakeUntil = t + dur * 0.7;
+      }
       // Tal becomes the rule engine: she injects wind + random bonks.
       tal.vx *= 1.25;
       tal.vy *= 1.1;
@@ -736,6 +1202,12 @@ function startChaosEvent(name){
   }
 
   if (audio) audio.sfx.chaos();
+
+  // Non-blocking quip (keep it short + not-sachy).
+  const s = world.stageIndex;
+  if (name === ChaosEvent.MUSHU_BOOST) setQuip(s === 0 ? 'מושו קיבל טורבו. למה? כי הוא מושו.' : 'מושו: טורבו. חוקי פיזיקה: בחופש.');
+  else if (name === ChaosEvent.SCREEN_SHAKE) setQuip(s === 2 ? 'זה לא רעידת אדמה, זה הבאס של הדי-ג׳יי.' : 'המסך רועד. החתונה עומדת בזה? לא.');
+  else if (name === ChaosEvent.BRIDE_RAGE) setQuip('טל: מי רץ אצלי באירוע??');
 }
 
 function updateChaos(dt){
@@ -745,8 +1217,10 @@ function updateChaos(dt){
 
   world.chaosCountdown -= dt;
   if (world.chaosCountdown <= 0){
-    world.chaosCountdown = CHAOS_INTERVAL;
-    const ev = pickWeighted(CHAOS_WEIGHTS);
+    const p = world.params || {};
+    world.chaosCountdown = p.chaosIntervalSec ?? 5;
+    const weights = p.chaosWeights || DEFAULT_CHAOS_WEIGHTS;
+    const ev = pickWeighted(weights);
     startChaosEvent(ev);
   }
 }
@@ -792,7 +1266,7 @@ function steerOfer(dt){
   const ax = (dx * 3.2 + input.dx * 10);
   const ay = (dy * 3.2 + input.dy * 10);
 
-  const accel = PLAYER_SPEED;
+  const accel = (world.params?.playerSpeed ?? 1250);
   ofer.vx += clamp(ax, -accel, accel) * dt;
   ofer.vy += clamp(ay, -accel, accel) * dt;
 }
@@ -855,7 +1329,8 @@ function updateMushuAI(dt){
   }
 
   // Base speed + chaos boost
-  const speed = (MUSHU_BASE_SPEED + 110 * Math.sin(mushu.mood * 2.1)) * world.mushuBoost;
+  const base = (world.params?.mushuBaseSpeed ?? DEFAULT_MUSHU_BASE_SPEED);
+  const speed = (base + 110 * Math.sin(mushu.mood * 2.1)) * world.mushuBoost;
   // Intentionally "wrong": dt scaling is slightly off for comedic slipperiness.
   mushu.vx += vx * speed * dt * rand(0.92, 1.08);
   mushu.vy += vy * speed * dt * rand(0.92, 1.08);
@@ -877,7 +1352,8 @@ function updateTal(dt){
   const t = world.t;
 
   // Grow a bit during Bride Rage so she can actually block the path.
-  const targetR = world.brideRage ? 30 : 20;
+  const rage = world.params?.talRage;
+  const targetR = world.brideRage ? (rage?.targetR ?? 30) : 20;
   tal.r = lerp(tal.r, targetR, clamp(dt * 10, 0, 1));
   clampBodyToArena(tal);
 
@@ -908,13 +1384,17 @@ function updateTal(dt){
     // Strongly correct both along + side errors so Tal sticks "between" them.
     const errAlong = desiredAlong - along;
     const errSide = -side;
-    const ax = (dx * errAlong * 7.0) + (px * errSide * 12.0);
-    const ay = (dy * errAlong * 7.0) + (py * errSide * 12.0);
-    tal.vx += clamp(ax, -1800, 1800) * dt;
-    tal.vy += clamp(ay, -1800, 1800) * dt;
+    const alongK = rage?.alongK ?? 7.0;
+    const sideK = rage?.sideK ?? 12.0;
+    const maxA = rage?.maxAccel ?? 1800;
+    const ax = (dx * errAlong * alongK) + (px * errSide * sideK);
+    const ay = (dy * errAlong * alongK) + (py * errSide * sideK);
+    tal.vx += clamp(ax, -maxA, maxA) * dt;
+    tal.vy += clamp(ay, -maxA, maxA) * dt;
 
     // Wind field (slightly wrong): pushes everyone sideways.
-    const wind = Math.sin(t * 9.5) * 280;
+    const windBase = rage?.wind ?? 280;
+    const wind = Math.sin(t * 9.5) * windBase;
     ofer.vx += wind * dt * 0.15;
     mushu.vx += wind * dt * 0.22;
   }
@@ -1017,7 +1497,15 @@ function update(dt){
     ofer.vx *= -1.2; ofer.vy = -Math.abs(ofer.vy) * 1.35;
     mushu.vx *= 0.15; mushu.vy *= 0.15;
 
-    enterEnd('CAUGHT');
+    // Stage progression: stage 1/2 auto-advance, stage 3 ends run.
+    if (world.stageIndex < STAGES.length - 1){
+      // Freeze moment, then show next stage overlay.
+      world.playEnabled = false;
+      scheduleNextStage();
+      setQuip('תפיסה הירואית. מושו: \"זה היה חימום\".', 1600);
+    } else {
+      enterEnd('ALL_CLEAR');
+    }
     return;
   }
 
@@ -1066,12 +1554,13 @@ function render(){
 
   // Screen shake chaos
   if (world.shakeUntil > world.t){
-    const s = rand(0.8, 1.6) * (window.devicePixelRatio || 1);
+    const intensity = (world.params?.shakeIntensity ?? 1.0);
+    const s = rand(0.8, 1.6) * intensity * (window.devicePixelRatio || 1);
     ctx.translate(rand(-1, 1) * s * 6, rand(-1, 1) * s * 6);
   }
 
-  // Background (garden wedding vibe).
-  if (!bgCache || bgCache.w !== w || bgCache.h !== h) buildBackgroundCache();
+  // Background (changes per stage: yard / hall / chuppah).
+  if (!bgCache || bgCache.w !== w || bgCache.h !== h || bgCache.stage !== (world.stageIndex ?? 0)) buildBackgroundCache();
   if (bgCache) ctx.drawImage(bgCache.c, 0, 0);
   else {
     ctx.fillStyle = '#7bd77f';
@@ -1088,18 +1577,21 @@ function render(){
       ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
       ctx.fill();
 
-      // Rim + flower ring
+      // Rim
       ctx.strokeStyle = 'rgba(18,49,28,.16)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(255,123,184,.26)';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(o.x, o.y, o.r * 0.72, 0, Math.PI * 2);
-      ctx.stroke();
+      // "Flower ring" decoration (disabled in stage 1 / yard).
+      if ((world.stageIndex ?? 0) !== 0){
+        ctx.strokeStyle = 'rgba(255,123,184,.26)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.r * 0.72, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     } else if (o.type === 'chair'){
       // Simple chair blob
       ctx.fillStyle = 'rgba(233,238,241,.78)';
@@ -1109,6 +1601,125 @@ function render(){
       ctx.strokeStyle = 'rgba(18,49,28,.12)';
       ctx.lineWidth = 2;
       ctx.stroke();
+    } else if (o.type === 'tree'){
+      // Tree: trunk + canopy
+      const trunkW = Math.max(6, o.r * 0.35);
+      const trunkH = Math.max(14, o.r * 0.70);
+      ctx.fillStyle = 'rgba(92,56,28,.60)';
+      drawRoundedRect(ctx, o.x - trunkW / 2, o.y + o.r * 0.10, trunkW, trunkH, 6, 'rgba(92,56,28,.62)', 'rgba(18,49,28,.10)');
+
+      const canopy = ctx.createRadialGradient(o.x - o.r * 0.25, o.y - o.r * 0.25, 2, o.x, o.y, o.r * 1.25);
+      canopy.addColorStop(0, 'rgba(255,255,255,.10)');
+      canopy.addColorStop(0.25, 'rgba(63,168,95,.62)');
+      canopy.addColorStop(1, 'rgba(18,49,28,.26)');
+      ctx.fillStyle = canopy;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.14)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (o.type === 'bush'){
+      // Bush: soft blob
+      const g = ctx.createRadialGradient(o.x - o.r * 0.25, o.y - o.r * 0.35, 2, o.x, o.y, o.r * 1.25);
+      g.addColorStop(0, 'rgba(255,255,255,.10)');
+      g.addColorStop(0.30, 'rgba(36,150,82,.54)');
+      g.addColorStop(1, 'rgba(18,49,28,.22)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(18,49,28,.12)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (o.type === 'flowers'){
+      // Decorative flowers patch (non-solid).
+      const rx = o.r * 1.15;
+      const ry = o.r * 0.85;
+      ctx.fillStyle = 'rgba(30,115,63,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const n = 40;
+      for (let i = 0; i < n; i++){
+        const t = Math.random() * Math.PI * 2;
+        const rr = Math.sqrt(Math.random());
+        const x = o.x + Math.cos(t) * rx * rr;
+        const y = o.y + Math.sin(t) * ry * rr;
+        const r = Math.random() * 2.2 + 1.0;
+        ctx.fillStyle = Math.random() < 0.22 ? 'rgba(255,123,184,0.36)' : 'rgba(255,210,231,0.34)';
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (o.type === 'fountain'){
+      drawFountain(ctx, o.x, o.y, o.r);
+    } else if (o.type === 'bed'){
+      // Flower bed (drawn as ellipse but collides as circle).
+      drawBed(ctx, o.x, o.y, o.r * 1.35, o.r * 0.85);
+    } else if (o.type === 'pole'){
+      // Chuppah pole
+      ctx.fillStyle = 'rgba(18,49,28,.24)';
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.20)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (o.type === 'buffet'){
+      // Buffet table (hall)
+      drawRoundedRect(ctx, o.x, o.y, o.w, o.h, o.r, 'rgba(255,250,243,.80)', 'rgba(18,49,28,.14)');
+      ctx.fillStyle = 'rgba(103,199,255,.10)';
+      ctx.fillRect(o.x + 10, o.y + 10, o.w - 20, Math.max(10, o.h * 0.22));
+      // Plates
+      ctx.fillStyle = 'rgba(233,238,241,.65)';
+      const n = 7;
+      for (let i = 0; i < n; i++){
+        const px = o.x + (o.w * (0.12 + i * (0.76 / (n - 1))));
+        const py = o.y + o.h * 0.66 + Math.sin(i * 1.3) * 2;
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (o.type === 'bar'){
+      // Bar (solid obstacle)
+      drawRoundedRect(ctx, o.x, o.y, o.w, o.h, o.r, 'rgba(55,32,18,.82)', 'rgba(255,255,255,.12)');
+      // Counter top
+      drawRoundedRect(ctx, o.x + 6, o.y + 6, o.w - 12, Math.max(14, o.h * 0.34), 14, 'rgba(255,250,243,.18)', 'rgba(18,49,28,.10)');
+      // Bottles
+      for (let i = 0; i < 8; i++){
+        const bx = o.x + o.w * (0.14 + i * 0.10);
+        const by = o.y + o.h * 0.62 + Math.sin(i * 1.1) * 2;
+        const bw = 6;
+        const bh = 14 + (i % 3) * 2;
+        const col = (i % 2 === 0) ? 'rgba(103,199,255,.22)' : 'rgba(255,210,231,.20)';
+        drawRoundedRect(ctx, bx - bw / 2, by - bh, bw, bh, 3, col, 'rgba(255,255,255,.10)');
+      }
+      // Label
+      ctx.font = '900 14px ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,250,243,.72)';
+      ctx.fillText('בר', o.x + o.w * 0.5, o.y + o.h * 0.28);
+    } else if (o.type === 'speaker'){
+      // Speaker (solid obstacle)
+      drawRoundedRect(ctx, o.x, o.y, o.w, o.h, o.r, 'rgba(18,18,22,.90)', 'rgba(255,255,255,.10)');
+      ctx.fillStyle = 'rgba(255,250,243,.06)';
+      ctx.fillRect(o.x + 8, o.y + 8, o.w - 16, 8);
+      // Woofers
+      const cx = o.x + o.w * 0.5;
+      const topCy = o.y + o.h * 0.46;
+      const botCy = o.y + o.h * 0.74;
+      const r0 = Math.min(o.w, o.h) * 0.20;
+      const r1 = Math.min(o.w, o.h) * 0.14;
+      ctx.fillStyle = 'rgba(0,0,0,.35)';
+      ctx.beginPath(); ctx.arc(cx, topCy, r0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, botCy, r0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,233,190,.10)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, topCy, r1, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, botCy, r1, 0, Math.PI * 2); ctx.stroke();
     } else if (o.type === 'chuppah'){
       // Canopy + poles
       const pad = 10;
@@ -1175,6 +1786,19 @@ function render(){
     const alpha = clamp(remain / 1.0, 0, 1);
     instructionsEl.style.opacity = String(alpha);
   }
+
+  // Stage overlay countdown (DOM overlay)
+  if (!stageUI.classList.contains('isHidden') && stageStartAt > 0){
+    const t = world.t;
+    if (t >= countdownFromAt && t < stageStartAt){
+      const n = Math.ceil(stageStartAt - t);
+      stageCountdownEl.textContent = `מתחילים בעוד ${n}…`;
+    } else if (t < countdownFromAt){
+      stageCountdownEl.textContent = '';
+    } else if (t >= stageStartAt){
+      stageCountdownEl.textContent = '';
+    }
+  }
 }
 
 function drawBody(b){
@@ -1184,20 +1808,38 @@ function drawBody(b){
   ctx.ellipse(b.x, b.y + b.r * 0.85, b.r * 0.95, b.r * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Body
-  const g = ctx.createRadialGradient(b.x - b.r * 0.35, b.y - b.r * 0.35, 2, b.x, b.y, b.r * 1.2);
-  g.addColorStop(0, 'rgba(255,255,255,.18)');
-  g.addColorStop(0.25, b.color);
-  g.addColorStop(1, 'rgba(0,0,0,.2)');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-  ctx.fill();
+  // Body (special case: characters use local sticker images for display only)
+  let stickerImg = null;
+  if (b === ofer) stickerImg = oferStickerImg;
+  else if (b === mushu) stickerImg = mushuStickerImg;
+  else if (b === tal) stickerImg = talStickerImg;
 
-  // Outline
-  ctx.strokeStyle = 'rgba(255,255,255,.16)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  const stickerReady = !!stickerImg && stickerImg.complete && stickerImg.naturalWidth > 0 && stickerImg.naturalHeight > 0;
+  if (stickerReady){
+    ctx.save();
+    // Scale sticker relative to body radius, preserve aspect ratio.
+    const targetW = b.r * 3.0;
+    const scale = targetW / stickerImg.naturalWidth;
+    const dw = stickerImg.naturalWidth * scale;
+    const dh = stickerImg.naturalHeight * scale;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(stickerImg, b.x - dw / 2, b.y - dh / 2, dw, dh);
+    ctx.restore();
+  } else {
+    const g = ctx.createRadialGradient(b.x - b.r * 0.35, b.y - b.r * 0.35, 2, b.x, b.y, b.r * 1.2);
+    g.addColorStop(0, 'rgba(255,255,255,.18)');
+    g.addColorStop(0.25, b.color);
+    g.addColorStop(1, 'rgba(0,0,0,.2)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outline
+    ctx.strokeStyle = 'rgba(255,255,255,.16)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 
   // Label
   drawLabel(b.label, b.x, b.y - b.r - 2);
@@ -1230,7 +1872,19 @@ function loop(){
   }
 
   if (state === GameState.PLAYING && !landscape){
-    update(dt);
+    // Stage start scheduling (uses world clock)
+    if (!world.playEnabled && stageStartAt > 0 && world.t >= stageStartAt){
+      const cfg = getStageCfg(pendingStageIndex);
+      applyStageParams(cfg);
+      resetGameToPlaying(pendingStageIndex);
+      world.playEnabled = true;
+      hideStageOverlay();
+      stageStartAt = 0;
+      countdownFromAt = 0;
+      if (pendingStageIndex === 0) hasShownStage1HowTo = true;
+    }
+
+    if (world.playEnabled) update(dt);
   }
 
   // Render (even if landscape, draw frozen background)
@@ -1275,6 +1929,20 @@ const OUTCOMES = {
       text: 'מושו בורח מהזירה. הטבעות הופכות למשימת צד. עופר מקבל זר ניחומים ולחיצת יד תקיפה.',
     },
   ],
+  ALL_CLEAR: [
+    {
+      title: 'החתונה ניצלה (בערך)',
+      text: 'תפסתם את מושו בשלב 3. הטבעות חזרו. טל אומרת \"סבבה\"—ואז עושה פרצוף של \"לא באמת\".',
+    },
+    {
+      title: 'סוף טוב, כאוס נשאר',
+      text: 'מושו נתפס. הכאוס נשמר לשימוש עתידי. עופר מקבל מדליה לא רשמית: \"חתן עם סיבולת\".',
+    },
+    {
+      title: 'מושו: הובס, זמנית',
+      text: 'הטבעות אצלכם. מושו כבר מתכנן DLC. טל דורשת שכולם יחזרו לרקוד כאילו כלום.',
+    },
+  ],
 };
 
 function pickOutcome(reason){
@@ -1284,7 +1952,8 @@ function pickOutcome(reason){
 
 function showOutcome(reason){
   const o = pickOutcome(reason);
-  endTitleEl.textContent = o.title;
+  const stageLabel = `שלב ${stageNum(world.stageIndex)} מתוך ${STAGES.length}`;
+  endTitleEl.textContent = reason === 'ALL_CLEAR' ? o.title : `${o.title} • ${stageLabel}`;
   endTextEl.textContent = o.text;
 }
 
@@ -1296,9 +1965,14 @@ function enterIdle(){
   setHidden(startUI, false);
   setHidden(endUI, true);
   setHidden(rotateUI, true);
+  setHidden(stageUI, true);
+  setQuip('');
   instructionsEl.style.opacity = '0';
   chaosEl.textContent = 'כאוס: רגוע(בערך)';
-  timerEl.textContent = `${GAME_DURATION.toFixed(1)}ש׳`;
+  timerEl.textContent = `${DEFAULT_GAME_DURATION.toFixed(1)}ש׳`;
+  world.playEnabled = false;
+  world.stageIndex = StageId.STAGE_1;
+  applyStageParams(getStageCfg(StageId.STAGE_1));
 }
 
 startBtn.addEventListener('click', async () => {
@@ -1306,7 +1980,11 @@ startBtn.addEventListener('click', async () => {
   await ensureAudioUnlocked();
   audio.sfx.start();
 
-  resetGameToPlaying();
+  // Start stage run (stage 1 has fullscreen how-to once).
+  state = GameState.PLAYING;
+  setHidden(startUI, true);
+  applyStageParams(getStageCfg(StageId.STAGE_1));
+  scheduleStageStart(StageId.STAGE_1, { showHowTo: !hasShownStage1HowTo });
   startLoopIfNeeded();
 }, { passive: true });
 
@@ -1314,7 +1992,12 @@ restartBtn.addEventListener('click', async () => {
   await ensureAudioUnlocked();
   audio.sfx.start();
 
-  resetGameToPlaying(); // END → PLAYING (MANDATORY)
+  // Retry same stage on TIME. After full clear, restart from stage 1.
+  const retryStage = world.endReason === 'TIME' ? world.stageIndex : StageId.STAGE_1;
+  state = GameState.PLAYING;
+  setHidden(endUI, true);
+  applyStageParams(getStageCfg(retryStage));
+  scheduleStageStart(retryStage, { showHowTo: false });
   startLoopIfNeeded();
 }, { passive: true });
 
@@ -1337,4 +2020,4 @@ enterEnd = function(reason){
   _origEnterEnd(reason);
 };
 
-// Application Security Requirement: no network calls, no external assets, touch-only input handled locally.
+// Application Security Requirement: no network calls, only local assets, touch-only input handled locally.

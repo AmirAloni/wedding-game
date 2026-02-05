@@ -29,10 +29,11 @@
           <div id="timer" class="pill">30.0ש׳</div>
           <div id="chaos" class="pill pill--chaos">כאוס: רגוע(בערך)</div>
         </div>
+        <div id="quip" class="quip" aria-live="polite"></div>
         <div id="instructions" class="instructions">
           גוררים את האצבע כדי לשלוט בעופר 🤵. תתפסו את מושו 🐶.
           <br />
-          יש מכשולים: שולחנות, כיסאות וחופה — אי אפשר לעבור דרכם.
+          יש מכשולים: שולחנות, כיסאות, בר, רמקולים, עצים ושיחים — אי אפשר לעבור דרכם.
           <br />
           כל 5 שניות: כאוס אקראי לכמה שניות. הפיזיקה עלולה לשקר.
         </div>
@@ -47,6 +48,16 @@
           <div class="tiny">
             טיפ: לנצח זה אופציונלי. קומדיה זה חובה.
           </div>
+        </div>
+      </section>
+
+      <!-- Stage intro / between stages -->
+      <section id="stageUI" class="overlay overlay--center isHidden" aria-label="מסך שלב">
+        <div class="panel">
+          <div id="stageTitle" class="title">שלב</div>
+          <div id="stageText" class="subtitle stageText"></div>
+          <div id="stageCountdown" class="countdown" aria-live="polite"></div>
+          <div id="stageTiny" class="tiny"></div>
         </div>
       </section>
 

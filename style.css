@@ -192,6 +192,44 @@ canvas#game{
   backdrop-filter: blur(8px);
 }
 
+.quip{
+  position:absolute;
+  left: 10px;
+  right: 10px;
+  top: calc(56px + 82px + env(safe-area-inset-top));
+  border: 1px solid rgba(255,123,184,.28);
+  background: rgba(255,250,243,.58);
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: rgba(18,49,28,.86);
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+  letter-spacing: .01em;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.quip.isOn{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stageText{
+  white-space: pre-line;
+}
+
+.countdown{
+  margin-top: 12px;
+  font-weight: 1000;
+  text-align: center;
+  font-size: 34px;
+  letter-spacing: .02em;
+  color: rgba(18,49,28,.92);
+  min-height: 42px;
+}
+
 /* Small-screen tuning */
 @media (max-width: 390px){
   .title{ font-size: 20px; }
