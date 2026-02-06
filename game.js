@@ -20,6 +20,12 @@ talStickerImg.loading = 'eager';
 talStickerImg.src = 'Tal.webp';
 
 // Stage 1 (yard) props
+const levelOneBgImg = new Image();
+levelOneBgImg.decoding = 'async';
+levelOneBgImg.loading = 'eager';
+levelOneBgImg.src = 'level-one-backgroung.jpg';
+levelOneBgImg.addEventListener('load', () => { bgCache = null; }, { once: true });
+
 const palmTreeImg = new Image();
 palmTreeImg.decoding = 'async';
 palmTreeImg.loading = 'eager';
@@ -122,11 +128,10 @@ const STAGES = [
       'גוררים אצבע = עופר 🤵 זז כמו מגנט על סקטבורד.',
       'המטרה: לתפוס את מושו 🐶 לפני שהטיימר נגמר.',
       'שולחנות/כיסאות/עצים/שיחים: לא עוברים דרכם. כן, זה אישי.',
-      'כל כמה שניות יש \"כאוס\" קטן. הפיזיקה עלולה לשקר.',
     ].join('\n'),
     // Difficulty
     durationSec: 30,
-    playerSpeed: 1450,
+    playerSpeed: 2800,
     mushuBaseSpeed: 290,
     chaosIntervalSec: 6.0,
     chaosEventMinMs: 3200,
@@ -150,7 +155,7 @@ const STAGES = [
     punch: 'זה לא טריאתלון. זה אירוע.',
     intro: 'טל כבר רואה הכל. במיוחד זיעה.',
     durationSec: 30,
-    playerSpeed: 1320,
+    playerSpeed: 2600,
     mushuBaseSpeed: 330,
     chaosIntervalSec: 5.0,
     chaosEventMinMs: 3800,
@@ -174,7 +179,7 @@ const STAGES = [
     punch: 'כולם צועקים \"רק עוד תמונה\" והוא בורח.',
     intro: 'זה השלב שבו מושו נהיה קטן-חמוד-חסין-לחוקים.',
     durationSec: 30,
-    playerSpeed: 1220,
+    playerSpeed: 2400,
     mushuBaseSpeed: 385,
     chaosIntervalSec: 4.5,
     chaosEventMinMs: 4200,
@@ -291,7 +296,7 @@ function scheduleNextStage(){
 function applyStageParams(cfg){
   world.params = {
     durationSec: cfg.durationSec ?? DEFAULT_GAME_DURATION,
-    playerSpeed: cfg.playerSpeed ?? 1250,
+    playerSpeed: cfg.playerSpeed ?? 2400,
     mushuBaseSpeed: cfg.mushuBaseSpeed ?? DEFAULT_MUSHU_BASE_SPEED,
     chaosIntervalSec: cfg.chaosIntervalSec ?? 5,
     chaosEventMinMs: cfg.chaosEventMinMs ?? DEFAULT_CHAOS_EVENT_MIN_MS,
@@ -371,6 +376,19 @@ function buildBackgroundCache(){
   c.width = w;
   c.height = h;
   const g = c.getContext('2d', { alpha: false });
+
+  function drawImageCover(img){
+    // Draw with "cover" behavior: fill canvas, preserve aspect, crop overflow.
+    if (!img || !img.naturalWidth || !img.naturalHeight) return false;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const s = Math.max(w / iw, h / ih);
+    const dw = iw * s;
+    const dh = ih * s;
+    const dx = (w - dw) / 2;
+    const dy = (h - dh) / 2;
+    g.drawImage(img, dx, dy, dw, dh);
+    return true;
+  }
 
   if (stage === 1){
     // Indoor hall: keep the TOP clean, put the dance floor up top near the bar.
@@ -466,20 +484,23 @@ function buildBackgroundCache(){
     g.fillStyle = vig;
     g.fillRect(0, 0, w, h);
   } else {
-    // Yard: lawn gradient.
-    const lawn = g.createRadialGradient(
-      w * 0.52,
-      h * 0.18,
-      Math.min(w, h) * 0.08,
-      w * 0.52,
-      h * 0.55,
-      Math.max(w, h) * 0.95
-    );
-    lawn.addColorStop(0, '#c3f07a');
-    lawn.addColorStop(0.45, '#7bd77f');
-    lawn.addColorStop(1, '#2f8d52');
-    g.fillStyle = lawn;
-    g.fillRect(0, 0, w, h);
+    // Yard (Stage 1): use provided background image, fallback to gradient if not loaded yet.
+    const drew = drawImageCover(levelOneBgImg);
+    if (!drew){
+      const lawn = g.createRadialGradient(
+        w * 0.52,
+        h * 0.18,
+        Math.min(w, h) * 0.08,
+        w * 0.52,
+        h * 0.55,
+        Math.max(w, h) * 0.95
+      );
+      lawn.addColorStop(0, '#c3f07a');
+      lawn.addColorStop(0.45, '#7bd77f');
+      lawn.addColorStop(1, '#2f8d52');
+      g.fillStyle = lawn;
+      g.fillRect(0, 0, w, h);
+    }
 
     // Soft vignette for depth.
     const vig = g.createRadialGradient(
@@ -1174,11 +1195,8 @@ const DEFAULT_CHAOS_WEIGHTS = [
 ];
 
 // Fill stage weights now that ChaosEvent exists.
-STAGES[0].chaosWeights = [
-  [ChaosEvent.MUSHU_BOOST, 1.45],
-  [ChaosEvent.SCREEN_SHAKE, 0.95],
-  // No bride rage in stage 1 (easy).
-];
+// Stage 1 (yard): no chaos at all.
+STAGES[0].chaosWeights = [];
 STAGES[1].chaosWeights = [
   [ChaosEvent.MUSHU_BOOST, 1.35],
   [ChaosEvent.SCREEN_SHAKE, 1.0],
@@ -1269,6 +1287,7 @@ function updateChaos(dt){
     const p = world.params || {};
     world.chaosCountdown = p.chaosIntervalSec ?? 5;
     const weights = p.chaosWeights || DEFAULT_CHAOS_WEIGHTS;
+    if (weights.length === 0) return; // Stage 1: no chaos
     const ev = pickWeighted(weights);
     startChaosEvent(ev);
   }
@@ -1312,10 +1331,10 @@ function steerOfer(dt){
   const dy = (ty - ofer.y);
 
   // Spring acceleration + a little "finger impulse" from drag delta.
-  const ax = (dx * 3.2 + input.dx * 10);
-  const ay = (dy * 3.2 + input.dy * 10);
+  const ax = (dx * 5.5 + input.dx * 18);
+  const ay = (dy * 5.5 + input.dy * 18);
 
-  const accel = (world.params?.playerSpeed ?? 1250);
+  const accel = (world.params?.playerSpeed ?? 2400);
   ofer.vx += clamp(ax, -accel, accel) * dt;
   ofer.vy += clamp(ay, -accel, accel) * dt;
 }
