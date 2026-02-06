@@ -39,8 +39,8 @@
       <div id="hud" class="hud" aria-label="תצוגת משחק">
         <div class="hudRow">
           <div id="timer" class="pill">30.0ש׳</div>
-          <div id="chaos" class="pill pill--chaos">כאוס: רגוע(בערך)</div>
         </div>
+        <div id="chaos" class="pill pill--chaos isHidden" aria-live="polite"></div>
         <div id="quip" class="quip" aria-live="polite"></div>
       </div>
 
@@ -49,6 +49,7 @@
         <div class="panel">
           <div id="endTitle" class="title">תוצאות הכאוס</div>
           <div id="endText" class="subtitle"></div>
+          <div id="endScore" class="scoreBox" aria-label="ניקוד"></div>
           <button id="restartBtn" class="bigBtn" type="button">עוד פעם</button>
           <div class="tiny">
             טיפ: לנצח זה אופציונלי. קומדיה זה חובה.

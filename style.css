@@ -110,6 +110,19 @@ canvas#game{
   margin: 0 0 14px 0;
 }
 
+.scoreBox{
+  white-space: pre-line;
+  text-align: center;
+  color: rgba(18,49,28,.80);
+  line-height: 1.35;
+  margin: 0 0 14px 0;
+  padding: 10px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(18,49,28,.12);
+  background: rgba(255,250,243,.55);
+  font-weight: 800;
+}
+
 .bigBtn{
   width:100%;
   font-size: 18px;
@@ -250,7 +263,7 @@ canvas#game{
 .hudRow{
   display:flex;
   gap:10px;
-  justify-content:space-between;
+  justify-content:flex-start;
   padding: calc(10px + env(safe-area-inset-top)) 10px 0 10px;
 }
 
@@ -271,6 +284,18 @@ canvas#game{
 .pill--chaos{
   color: rgba(106, 28, 66, .92);
   border-color: rgba(255,123,184,.40);
+}
+
+#chaos.pill--chaos{
+  position:absolute;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 20px);
+  text-align:center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .instructions{

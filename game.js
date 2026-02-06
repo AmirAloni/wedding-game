@@ -7,44 +7,76 @@
 const oferStickerImg = new Image();
 oferStickerImg.decoding = 'async';
 oferStickerImg.loading = 'eager';
-oferStickerImg.src = 'ofer.webp';
+oferStickerImg.src = 'assets/ofer.webp';
 
 const mushuStickerImg = new Image();
 mushuStickerImg.decoding = 'async';
 mushuStickerImg.loading = 'eager';
-mushuStickerImg.src = 'Mushu.webp';
+mushuStickerImg.src = 'assets/Mushu.webp';
 
 const talStickerImg = new Image();
 talStickerImg.decoding = 'async';
 talStickerImg.loading = 'eager';
-talStickerImg.src = 'Tal.webp';
+talStickerImg.src = 'assets/Tal.webp';
+
+// Bride rage stickers (used during ChaosEvent.BRIDE_RAGE)
+const brideRageOneImg = new Image();
+brideRageOneImg.decoding = 'async';
+brideRageOneImg.loading = 'eager';
+brideRageOneImg.src = 'assets/bride-rage-one.webp';
+
+const brideRageTwoImg = new Image();
+brideRageTwoImg.decoding = 'async';
+brideRageTwoImg.loading = 'eager';
+brideRageTwoImg.src = 'assets/bride-rage-two.webp';
 
 // Stage 1 (yard) props
 const levelOneBgImg = new Image();
 levelOneBgImg.decoding = 'async';
 levelOneBgImg.loading = 'eager';
-levelOneBgImg.src = 'level-one-backgroung.jpg';
+levelOneBgImg.src = 'assets/level-one-backgroung.jpg';
 levelOneBgImg.addEventListener('load', () => { bgCache = null; }, { once: true });
 
 const palmTreeImg = new Image();
 palmTreeImg.decoding = 'async';
 palmTreeImg.loading = 'eager';
-palmTreeImg.src = 'palm-tree.webp';
+palmTreeImg.src = 'assets/palm-tree.webp';
 
 const treeImg = new Image();
 treeImg.decoding = 'async';
 treeImg.loading = 'eager';
-treeImg.src = 'tree.webp';
+treeImg.src = 'assets/tree.webp';
 
 const pinkBushImg = new Image();
 pinkBushImg.decoding = 'async';
 pinkBushImg.loading = 'eager';
-pinkBushImg.src = 'pink-bush.webp';
+pinkBushImg.src = 'assets/pink-bush.webp';
 
 const tableOutsideImg = new Image();
 tableOutsideImg.decoding = 'async';
 tableOutsideImg.loading = 'eager';
-tableOutsideImg.src = 'table-outside.webp';
+tableOutsideImg.src = 'assets/table-outside.webp';
+
+// Stage 2 (hall) props
+const barImg = new Image();
+barImg.decoding = 'async';
+barImg.loading = 'eager';
+barImg.src = 'assets/bar.webp';
+
+const indoorTableImg = new Image();
+indoorTableImg.decoding = 'async';
+indoorTableImg.loading = 'eager';
+indoorTableImg.src = 'assets/indoor-table.webp';
+
+const leftSpeakerImg = new Image();
+leftSpeakerImg.decoding = 'async';
+leftSpeakerImg.loading = 'eager';
+leftSpeakerImg.src = 'assets/left-speaker.webp';
+
+const rightSpeakerImg = new Image();
+rightSpeakerImg.decoding = 'async';
+rightSpeakerImg.loading = 'eager';
+rightSpeakerImg.src = 'assets/right-speaker.webp';
 
 // =============================
 // Constants (tweak here)
@@ -94,6 +126,7 @@ const stageTitleEl = document.getElementById('stageTitle');
 const stageTextEl = document.getElementById('stageText');
 const stageCountdownEl = document.getElementById('stageCountdown');
 const stageTinyEl = document.getElementById('stageTiny');
+const endScoreEl = document.getElementById('endScore');
 
 // =============================
 // State machine (MANDATORY)
@@ -130,7 +163,7 @@ const STAGES = [
       'שולחנות/כיסאות/עצים/שיחים: לא עוברים דרכם. כן, זה אישי.',
     ].join('\n'),
     // Difficulty
-    durationSec: 30,
+    durationSec: 60,
     playerSpeed: 2800,
     mushuBaseSpeed: 290,
     chaosIntervalSec: 6.0,
@@ -154,7 +187,7 @@ const STAGES = [
     place: 'באולם',
     punch: 'זה לא טריאתלון. זה אירוע.',
     intro: 'טל כבר רואה הכל. במיוחד זיעה.',
-    durationSec: 30,
+    durationSec: 40,
     playerSpeed: 2600,
     mushuBaseSpeed: 330,
     chaosIntervalSec: 5.0,
@@ -169,6 +202,7 @@ const STAGES = [
       targetR: 28,
       alongK: 7.0,
       sideK: 12.0,
+      blockAlongFrac: 0.12,
       maxAccel: 1800,
       wind: 280,
     },
@@ -186,18 +220,66 @@ const STAGES = [
     chaosEventMaxMs: 4800,
     chaosWeights: null,
     mushuBoostRange: [1.75, 2.35],
-    shakeIntensity: 1.25,
+    shakeIntensity: 0.85,
     brideRageEnabled: true,
     brideRageDurFactor: 1.05,
     talRage: {
       targetR: 32,
       alongK: 7.6,
       sideK: 13.8,
+      blockAlongFrac: 0.10,
       maxAccel: 1950,
       wind: 340,
     },
   },
 ];
+
+// Per-run scoring (faster catch => more points).
+const runScore = {
+  stages: Array.from({ length: STAGES.length }, () => ({
+    points: null,
+    timeSpentSec: null,
+    durationSec: null,
+  })),
+  totalPoints: 0,
+};
+
+function recalcTotalPoints(){
+  runScore.totalPoints = runScore.stages.reduce((acc, s) => acc + (s.points ?? 0), 0);
+}
+
+function resetScoreFromStage(stageIndex){
+  for (let i = stageIndex; i < runScore.stages.length; i++){
+    runScore.stages[i].points = null;
+    runScore.stages[i].timeSpentSec = null;
+    runScore.stages[i].durationSec = null;
+  }
+  recalcTotalPoints();
+}
+
+function awardCatchScore(stageIndex){
+  const cfg = getStageCfg(stageIndex);
+  const dur = (cfg?.durationSec ?? world.params?.durationSec ?? DEFAULT_GAME_DURATION);
+  const remaining = clamp(world.timeLeft ?? 0, 0, dur);
+  const points = Math.max(0, Math.round((remaining / dur) * 1000));
+  const timeSpentSec = clamp(dur - remaining, 0, dur);
+  runScore.stages[stageIndex].points = points;
+  runScore.stages[stageIndex].timeSpentSec = timeSpentSec;
+  runScore.stages[stageIndex].durationSec = dur;
+  recalcTotalPoints();
+  return points;
+}
+
+function renderEndScore(){
+  if (!endScoreEl) return;
+  const lines = runScore.stages.map((s, i) => {
+    const label = `שלב ${i + 1}`;
+    if (s.points == null) return `${label}: —`;
+    return `${label}: ${s.points} נק׳ • ${s.timeSpentSec.toFixed(1)}ש׳`;
+  });
+  lines.push(`סה״כ: ${runScore.totalPoints} נק׳`);
+  endScoreEl.textContent = lines.join('\n');
+}
 
 let hasShownStage1HowTo = false;
 let pendingStageIndex = StageId.STAGE_1;
@@ -328,8 +410,8 @@ function isImgReady(img){
   return !!(img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0);
 }
 
-function drawImgContain(g, img, cx, cy, maxW, maxH, anchor){
-  if (!isImgReady(img)) return false;
+function imgContainDims(img, cx, cy, maxW, maxH, anchor){
+  // Returns the exact draw rect that drawImgContain() will use.
   const iw = img.naturalWidth;
   const ih = img.naturalHeight;
   const s = Math.min(maxW / iw, maxH / ih);
@@ -337,9 +419,27 @@ function drawImgContain(g, img, cx, cy, maxW, maxH, anchor){
   const h = ih * s;
   const x = cx - w / 2;
   const y = (anchor === 'bottom') ? (cy - h) : (cy - h / 2);
+  return { x, y, w, h };
+}
+
+function drawImgContain(g, img, cx, cy, maxW, maxH, anchor){
+  if (!isImgReady(img)) return false;
+  const { x, y, w, h } = imgContainDims(img, cx, cy, maxW, maxH, anchor);
   g.drawImage(img, x, y, w, h);
   return true;
 }
+
+// Stage 1 tree hitbox tuning (images are not perfectly centered).
+// Use a circular hitbox centered within the drawn tree image.
+const STAGE1_TREE_HITBOX = Object.freeze({
+  // Radius as fraction of drawn image MIN(w,h)
+  r: 0.24,
+  // Center Y as fraction of drawn image height from top (0=top, 1=bottom)
+  cy: 0.56,
+  // X offset as fraction of drawn image width (for trunk centering).
+  palmX: -0.03,
+  treeX: 0.03,
+});
 
 function setHidden(el, hidden){
   el.classList.toggle('isHidden', !!hidden);
@@ -767,6 +867,7 @@ const world = {
 
   mushuBoost: 1,
   brideRage: false,
+  fireTrailAcc: 0,
 
   caught: false,
   endReason: '',
@@ -776,6 +877,7 @@ const ofer = {
   x: 0, y: 0,
   vx: 0, vy: 0,
   r: 22,
+  renderScale: 1.3,
   color: '#3cffb0',
   label: 'עופר 🤵',
 };
@@ -784,6 +886,7 @@ const mushu = {
   x: 0, y: 0,
   vx: 0, vy: 0,
   r: 18,
+  renderScale: 1.3,
   color: '#ff4fd8',
   label: 'מושו 🐶',
   hasRings: true,
@@ -795,6 +898,7 @@ const tal = {
   x: 0, y: 0,
   vx: 0, vy: 0,
   r: 20,
+  renderScale: 1.3,
   color: '#ffd36b',
   label: 'טל 👰',
   visible: true,
@@ -862,7 +966,8 @@ function buildObstacles(){
   }
 
   function addTree(nx, ny, nr){
-    const r = clamp(Math.min(w, h) * nr, 24, 46);
+    // Stage 1 uses trees heavily; allow a bit larger max radius for clearer readability.
+    const r = clamp(Math.min(w, h) * nr, 24, 60);
     const x = clamp(w * nx, left + r, right - r);
     const y = clamp(h * ny, top + r, bottom - r);
     obstacles.push({ kind: 'circle', type: 'tree', x, y, r });
@@ -892,8 +997,9 @@ function buildObstacles(){
   }
 
   function addBar(nx, ny, nW, nH){
-    const bw = clamp(w * nW, 180, 360);
-    const bh = clamp(h * nH, 62, 120);
+    // Wider/taller collision than before (hall bar should feel "solid").
+    const bw = clamp(w * nW, 180, 520);
+    const bh = clamp(h * nH, 62, 160);
     const x = clamp(w * nx - bw / 2, left, right - bw);
     const y = clamp(h * ny, top, bottom - bh);
     obstacles.push({ kind: 'rect', type: 'bar', x, y, w: bw, h: bh, r: 18 });
@@ -917,42 +1023,73 @@ function buildObstacles(){
   // Stage-specific layouts (yard / hall / under the chuppah)
   if (stage === 0){
     // Yard: no chuppah, no bed. Add garden props.
-    addTableWithChairs(
-      clamp(w * 0.30, left + tableR + 18, right - tableR - 18),
-      clamp(h * 0.66, top + 150, bottom - tableR - 28),
-      0
-    );
-    addTableWithChairs(
-      clamp(w * 0.74, left + tableR + 18, right - tableR - 18),
-      clamp(h * 0.58, top + 140, bottom - tableR - 28),
-      0
-    );
+    const yardTableR = clamp(tableR * 1.28, 42, 74);
+    function addYardTable(nx, ny){
+      const x = clamp(w * nx, left + yardTableR + 18, right - yardTableR - 18);
+      const y = clamp(h * ny, top + 150, bottom - yardTableR - 28);
+      obstacles.push({ kind: 'circle', type: 'table', x, y, r: yardTableR });
+    }
+    // Space out the tables (avoid overlaps with larger radius).
+    addYardTable(0.18, 0.91);
+    addYardTable(0.50, 0.81);
+    addYardTable(0.82, 0.91);
 
     // Trees & bushes are solid (obstacles).
-    addTree(0.14, 0.26, 0.055);
-    addTree(0.86, 0.26, 0.055);
-    addTree(0.12, 0.82, 0.060);
-    addTree(0.88, 0.80, 0.060);
+    // Stage 1 tweak: move trees slightly upward + make them larger.
+    // Collision is a circle centered in the image, synced during render.
+    function addYardTree(nx, ny, nCollisionR, nRenderScale, variant){
+      const r = clamp(Math.min(w, h) * nCollisionR, 24, 60);
+      const x = clamp(w * nx, left + r, right - r);
+      const y = clamp(h * ny, top + r, bottom - r);
+      const renderR = r * nRenderScale;
+      const maxW = renderR * 4.40;
+      const maxH = renderR * 6.35;
+      const cx = clamp(x, left + maxW / 2, right - maxW / 2);
+      const by = y + r; // bottom aligned to the collision bottom
+      // Approx until assets are ready; render() will sync based on actual image rect.
+      const xOff = (variant === 'palm') ? STAGE1_TREE_HITBOX.palmX : STAGE1_TREE_HITBOX.treeX;
+      const colCx = cx + maxW * xOff;
+      const colCy = (by - maxH) + maxH * STAGE1_TREE_HITBOX.cy;
+      const colR = Math.min(maxW, maxH) * STAGE1_TREE_HITBOX.r;
+      obstacles.push({
+        kind: 'circle',
+        type: 'tree',
+        // Collision circle (center-ish)
+        x: colCx,
+        y: colCy,
+        r: colR,
+        // Draw config
+        drawCx: cx,
+        drawBy: by,
+        drawMaxW: maxW,
+        drawMaxH: maxH,
+        variant,
+      });
+    }
+    addYardTree(0.14, 0.22, 0.066, 1.35, 'tree');
+    addYardTree(0.86, 0.22, 0.060, 1.35, 'tree');
+    // Bottom two: move further upward.
+    addYardTree(0.12, 0.66, 0.066, 1.35, 'palm');
+    addYardTree(0.88, 0.64, 0.060, 1.35, 'palm');
 
-    addBush(0.28, 0.46, 0.040);
-    addBush(0.72, 0.44, 0.040);
-    addBush(0.18, 0.60, 0.036);
-    addBush(0.82, 0.62, 0.036);
+    // Move bushes upward a bit.
+    addBush(0.28, 0.30, 0.040);
+    addBush(0.72, 0.28, 0.040);
+    addBush(0.18, 0.44, 0.036);
+    addBush(0.82, 0.42, 0.036);
   } else if (stage === 1){
     // Hall: clean top area; bar + speakers + dance floor are up top.
-    addBar(0.50, 0.12, 0.62, 0.11);
-    addSpeaker(0.28, 0.30, 0.11, 0.17);
-    addSpeaker(0.72, 0.30, 0.11, 0.17);
+    addBar(0.50, 0.07, 0.62, 0.11);
+    addSpeaker(0.10, 0.30, 0.16, 0.22);
+    addSpeaker(0.90, 0.30, 0.16, 0.22);
 
-    // Tables moved lower to keep the top clear.
-    addTableWithChairs(clamp(w * 0.22, left + tableR + 18, right - tableR - 18), clamp(h * 0.70, top + 190, bottom - tableR - 18), 6);
-    addTableWithChairs(clamp(w * 0.78, left + tableR + 18, right - tableR - 18), clamp(h * 0.76, top + 210, bottom - tableR - 18), 6);
-    addTableWithChairs(clamp(w * 0.26, left + tableR + 18, right - tableR - 18), clamp(h * 0.88, top + 260, bottom - tableR - 18), 5);
-    addTableWithChairs(clamp(w * 0.74, left + tableR + 18, right - tableR - 18), clamp(h * 0.90, top + 270, bottom - tableR - 18), 5);
-
-    // A couple of stray chairs (still obstacles) but not in the top area.
-    obstacles.push({ kind: 'circle', type: 'chair', x: clamp(w * 0.44, left + chairR, right - chairR), y: clamp(h * 0.52, top + chairR, bottom - chairR), r: chairR });
-    obstacles.push({ kind: 'circle', type: 'chair', x: clamp(w * 0.56, left + chairR, right - chairR), y: clamp(h * 0.54, top + chairR, bottom - chairR), r: chairR });
+    // Tables symmetric: two rows, left/right mirror (same y per row, same distance from center).
+    const row1Y = clamp(h * 0.68, top + 190, bottom - tableR - 18);
+    const row2Y = clamp(h * 0.84, top + 260, bottom - tableR - 18);
+    addTableWithChairs(clamp(w * 0.22, left + tableR + 18, right - tableR - 18), row1Y, 6);
+    addTableWithChairs(clamp(w * 0.78, left + tableR + 18, right - tableR - 18), row1Y, 6);
+    addTableWithChairs(clamp(w * 0.26, left + tableR + 18, right - tableR - 18), row2Y, 5);
+    addTableWithChairs(clamp(w * 0.74, left + tableR + 18, right - tableR - 18), row2Y, 5);
   } else {
     // Under the chuppah: giant canopy + poles, minimal clutter.
     addChuppah(0.50, 0.14, 0.72, 0.20);
@@ -1082,15 +1219,37 @@ function spawnConfetti(n, x, y, strength){
       vx: rand(-1, 1) * strength * rand(0.4, 1.2),
       vy: rand(-1.2, 0.2) * strength * rand(0.4, 1.2),
       life: rand(0.5, 1.1),
+      maxLife: 0,
       hue: randInt(0, 360),
       size: rand(2, 5),
       spin: rand(-10, 10),
     });
+    particles[particles.length - 1].maxLife = particles[particles.length - 1].life;
   }
+}
+
+function spawnFire(x, y, dirX, dirY, baseSpeed){
+  // Fire particle used for Mushu turbo trail.
+  const sp = baseSpeed ?? rand(40, 140);
+  const px = -dirY, py = dirX; // perpendicular jitter
+  const life = rand(0.16, 0.32);
+  particles.push({
+    type: 'fire',
+    x: x + rand(-2, 2),
+    y: y + rand(-2, 2),
+    vx: (dirX * sp + px * rand(-45, 45)) * rand(0.7, 1.15),
+    vy: (dirY * sp + py * rand(-45, 45) - rand(15, 55)) * rand(0.7, 1.15),
+    life,
+    maxLife: life,
+    hue: randInt(18, 55), // orange→yellow
+    size: rand(5, 11),
+    spin: rand(-6, 6),
+  });
 }
 
 function resetGameToPlaying(stageIndex){
   world.stageIndex = clamp(stageIndex ?? world.stageIndex ?? 0, 0, STAGES.length - 1);
+  resetScoreFromStage(world.stageIndex);
   const cfg = getStageCfg(world.stageIndex);
   applyStageParams(cfg);
   resizeCanvas();
@@ -1108,6 +1267,7 @@ function resetGameToPlaying(stageIndex){
   world.shakeUntil = 0;
   world.mushuBoost = 1;
   world.brideRage = false;
+  world.fireTrailAcc = 0;
   world.caught = false;
   world.endReason = '';
 
@@ -1187,6 +1347,14 @@ const ChaosEvent = Object.freeze({
   BRIDE_RAGE: 'מצב: טל עצבנית',
 });
 
+function chaosBannerText(name){
+  // Keep it short; shown at top-of-screen only while chaos is active.
+  if (name === ChaosEvent.BRIDE_RAGE) return 'הכלה זועמת!';
+  if (name === ChaosEvent.MUSHU_BOOST) return 'מושו בטורבו!';
+  if (name === ChaosEvent.SCREEN_SHAKE) return 'רעידת באס!';
+  return String(name || '');
+}
+
 // Bias: more goofy camera + controls.
 const DEFAULT_CHAOS_WEIGHTS = [
   [ChaosEvent.MUSHU_BOOST, 1.1],
@@ -1198,13 +1366,11 @@ const DEFAULT_CHAOS_WEIGHTS = [
 // Stage 1 (yard): no chaos at all.
 STAGES[0].chaosWeights = [];
 STAGES[1].chaosWeights = [
-  [ChaosEvent.MUSHU_BOOST, 1.35],
   [ChaosEvent.SCREEN_SHAKE, 1.0],
   [ChaosEvent.BRIDE_RAGE, 1.05],
 ];
 STAGES[2].chaosWeights = [
   [ChaosEvent.MUSHU_BOOST, 1.35],
-  [ChaosEvent.SCREEN_SHAKE, 1.25],
   [ChaosEvent.BRIDE_RAGE, 1.25],
 ];
 
@@ -1270,11 +1436,8 @@ function startChaosEvent(name){
 
   if (audio) audio.sfx.chaos();
 
-  // Non-blocking quip (keep it short + not-sachy).
-  const s = world.stageIndex;
-  if (name === ChaosEvent.MUSHU_BOOST) setQuip(s === 0 ? 'מושו קיבל טורבו. למה? כי הוא מושו.' : 'מושו: טורבו. חוקי פיזיקה: בחופש.');
-  else if (name === ChaosEvent.SCREEN_SHAKE) setQuip(s === 2 ? 'זה לא רעידת אדמה, זה הבאס של הדי-ג׳יי.' : 'המסך רועד. החתונה עומדת בזה? לא.');
-  else if (name === ChaosEvent.BRIDE_RAGE) setQuip('טל: מי רץ אצלי באירוע??');
+  // During chaos: show only the chaos banner (no extra quip text).
+  setQuip('');
 }
 
 function updateChaos(dt){
@@ -1438,10 +1601,11 @@ function updateTal(dt){
     dx /= d; dy /= d;
     const px = -dy, py = dx; // perpendicular
 
-    // Desired point along the segment Ofer→Mushu (slightly closer to Mushu to block better).
+    // Desired point along the segment Ofer→Mushu (very close to Ofer to physically block him).
     const minAlong = ofer.r + tal.r + 12;
     const maxAlong = d - (mushu.r + tal.r + 12);
-    const desiredAlong = clamp(d * 0.58, minAlong, Math.max(minAlong, maxAlong));
+    const frac = clamp(rage?.blockAlongFrac ?? 0.12, 0, 1);
+    const desiredAlong = minAlong + (Math.max(minAlong, maxAlong) - minAlong) * frac;
 
     // Express Tal position in (along, side) relative to Ofer→Mushu line.
     const rx = tal.x - ofer.x;
@@ -1503,8 +1667,9 @@ function updateParticles(dt){
     if (p.life <= 0){ particles.splice(i, 1); continue; }
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vx *= Math.pow(0.92, dt * 60);
-    p.vy *= Math.pow(0.92, dt * 60);
+    const damp = (p.type === 'fire') ? 0.86 : 0.92;
+    p.vx *= Math.pow(damp, dt * 60);
+    p.vy *= Math.pow(damp, dt * 60);
   }
 }
 
@@ -1537,9 +1702,28 @@ function update(dt){
 
   // Drag + bounce
   applyDrag(ofer, dt, 0.92);
-  applyDrag(mushu, dt, 0.955);
+  const isMushuTurbo = world.chaosActive && world.chaosName === ChaosEvent.MUSHU_BOOST;
+  // Turbo should *feel* faster: keep more momentum (less damping).
+  applyDrag(mushu, dt, isMushuTurbo ? 0.975 : 0.955);
   boundsBounce(ofer, true);
   boundsBounce(mushu, false);
+
+  // Mushu turbo fire trail (visual only)
+  if (isMushuTurbo){
+    world.fireTrailAcc += dt * 110; // particles/sec
+    const v = Math.hypot(mushu.vx, mushu.vy);
+    const inv = 1 / (v || 1);
+    const dirX = -(mushu.vx * inv);
+    const dirY = -(mushu.vy * inv);
+    const tailX = mushu.x + dirX * (mushu.r * 0.65);
+    const tailY = mushu.y + dirY * (mushu.r * 0.65);
+    while (world.fireTrailAcc >= 1){
+      world.fireTrailAcc -= 1;
+      spawnFire(tailX, tailY, dirX, dirY, rand(60, 170) + v * 0.08);
+    }
+  } else {
+    world.fireTrailAcc = 0;
+  }
 
   // Tal bonks (especially in rage)
   if (tal.visible){
@@ -1559,6 +1743,7 @@ function update(dt){
     world.caught = true;
     mushu.hasRings = false;
     if (audio) audio.sfx.win();
+    const pts = awardCatchScore(world.stageIndex);
 
     // Exaggerated win animation: confetti + overpowered bounce.
     spawnConfetti(90, mushu.x, mushu.y, 520);
@@ -1573,7 +1758,7 @@ function update(dt){
       stageStartAt = world.t + 0.7;
       countdownFromAt = 0;
       hideStageOverlay();
-      setQuip('תפיסה הירואית. מושו: \"זה היה חימום\".', 1600);
+      setQuip(`תפיסה הירואית (+${pts} נק׳). מושו: \"זה היה חימום\".`, 1900);
     } else {
       enterEnd('ALL_CLEAR');
     }
@@ -1641,25 +1826,61 @@ function render(){
   // Wedding props (obstacles)
   if (!obstacles.length) buildObstacles();
   const stageIndex = (world.stageIndex ?? 0);
-  let yardTreeIdx = 0;
   for (let i = 0; i < obstacles.length; i++){
     const o = obstacles[i];
     // Stage 1 (yard): swap props to provided webp assets.
     if (stageIndex === 0){
       if (o.type === 'table'){
         // Slightly larger than collision radius for readability.
-        if (drawImgContain(ctx, tableOutsideImg, o.x, o.y, o.r * 3.15, o.r * 3.15, 'center')) continue;
+        if (drawImgContain(ctx, tableOutsideImg, o.x, o.y, o.r * 3.35, o.r * 3.35, 'center')) continue;
       } else if (o.type === 'bush'){
         // Slightly bottom-anchored so it "sits" on the lawn.
         if (drawImgContain(ctx, pinkBushImg, o.x, o.y + o.r * 1.05, o.r * 2.65, o.r * 2.35, 'bottom')) continue;
       } else if (o.type === 'tree'){
-        const img = (yardTreeIdx++ % 2 === 0) ? palmTreeImg : treeImg;
-        // Taller + wider so trees read better on mobile.
-        if (drawImgContain(ctx, img, o.x, o.y + o.r * 1.20, o.r * 3.45, o.r * 5.05, 'bottom')) continue;
+        const img = (o.variant === 'palm') ? palmTreeImg : treeImg;
+        const cx = o.drawCx ?? o.cx ?? (o.x + o.w / 2);
+        const by = o.drawBy ?? o.by ?? (o.y + o.h);
+        const maxW = o.drawMaxW ?? o.maxW ?? (o.w || 0);
+        const maxH = o.drawMaxH ?? o.maxH ?? (o.h || 0);
+        if (isImgReady(img)){
+          const d = imgContainDims(img, cx, by, maxW, maxH, 'bottom');
+          ctx.drawImage(img, d.x, d.y, d.w, d.h);
+          // Sync collision circle to the (tunable) center of the drawn image.
+          const xOff = (o.variant === 'palm') ? STAGE1_TREE_HITBOX.palmX : STAGE1_TREE_HITBOX.treeX;
+          const colCx = (d.x + d.w * 0.5) + d.w * xOff;
+          const colCy = d.y + d.h * STAGE1_TREE_HITBOX.cy;
+          const colR = Math.min(d.w, d.h) * STAGE1_TREE_HITBOX.r;
+          o.kind = 'circle';
+          o.x = colCx;
+          o.y = colCy;
+          o.r = colR;
+          continue;
+        }
+        // Fallback: draw with the approximate max rect.
+        if (drawImgContain(ctx, img, cx, by, maxW, maxH, 'bottom')) continue;
+      }
+    }
+
+    // Stage 2 (hall): bar, indoor tables, left/right speakers from assets.
+    if (stageIndex === 1){
+      if (o.type === 'table'){
+        drawImgContain(ctx, indoorTableImg, o.x, o.y, o.r * 4.4, o.r * 4.4, 'center');
+        continue;
+      } else if (o.type === 'bar'){
+        const cx = o.x + o.w / 2;
+        const cy = o.y + o.h / 2;
+        if (drawImgContain(ctx, barImg, cx, cy, o.w * 3.3, o.h * 3.3, 'center')) continue;
+      } else if (o.type === 'speaker'){
+        const isLeft = o.x < w / 2;
+        const img = isLeft ? leftSpeakerImg : rightSpeakerImg;
+        const cx = o.x + o.w / 2;
+        const cy = o.y + o.h / 2;
+        if (drawImgContain(ctx, img, cx, cy, o.w * 1.5, o.h * 1.5, 'center')) continue;
       }
     }
 
     if (o.type === 'table'){
+      if (stageIndex === 1) continue;
       // Table cloth
       ctx.fillStyle = 'rgba(255,250,243,.86)';
       ctx.beginPath();
@@ -1682,6 +1903,7 @@ function render(){
         ctx.stroke();
       }
     } else if (o.type === 'chair'){
+      if (stageIndex === 1) continue;
       // Simple chair blob
       ctx.fillStyle = 'rgba(233,238,241,.78)';
       ctx.beginPath();
@@ -1836,18 +2058,19 @@ function render(){
 
   // Ring aura around Mushu if he has rings
   if (mushu.hasRings){
+    const mushuVr = mushu.r * (mushu.renderScale ?? 1);
     const pulse = 0.5 + 0.5 * Math.sin(world.t * 9);
     ctx.strokeStyle = `rgba(255,215,140,${0.18 + 0.18 * pulse})`;
     ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.arc(mushu.x, mushu.y, mushu.r + 10 + pulse * 4, 0, Math.PI * 2);
+    ctx.arc(mushu.x, mushu.y, mushuVr + 10 + pulse * 4, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.font = '800 18px system-ui, -apple-system, Segoe UI, Roboto, Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,235,190,.95)';
-    ctx.fillText('💍💍', mushu.x, mushu.y - mushu.r - 16);
+    ctx.fillText('💍💍', mushu.x, mushu.y - mushuVr - 16);
   }
 
   // Characters
@@ -1857,17 +2080,42 @@ function render(){
 
   // Particles on top
   for (const p of particles){
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.spin * (1 - p.life));
-    ctx.fillStyle = `hsla(${p.hue}, 90%, 65%, ${clamp(p.life, 0, 1)})`;
-    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.8);
-    ctx.restore();
+    const life0 = (p.maxLife ?? 1) || 1;
+    const k = clamp(p.life / life0, 0, 1);
+    if (p.type === 'fire'){
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.spin ?? 0) * (1 - k));
+      // Outer glow
+      ctx.fillStyle = `hsla(${p.hue ?? 35}, 98%, 55%, ${0.30 * k})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, (p.size ?? 8) * (1.0 + (1 - k) * 0.45), 0, Math.PI * 2);
+      ctx.fill();
+      // Hot core
+      ctx.fillStyle = `hsla(${(p.hue ?? 35) + 10}, 98%, 75%, ${0.55 * k})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, (p.size ?? 8) * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.spin ?? 0) * (1 - k));
+      ctx.fillStyle = `hsla(${p.hue ?? 0}, 90%, 65%, ${k})`;
+      ctx.fillRect(-(p.size ?? 3) / 2, -(p.size ?? 3) / 2, (p.size ?? 3), (p.size ?? 3) * 0.8);
+      ctx.restore();
+    }
   }
 
   // HUD text updates (DOM overlay)
   timerEl.textContent = `${world.timeLeft.toFixed(1)}ש׳`;
-  chaosEl.textContent = world.chaosActive ? `כאוס: ${world.chaosName}` : 'כאוס: רגוע(בערך)';
+  if (world.chaosActive){
+    chaosEl.textContent = chaosBannerText(world.chaosName);
+    setHidden(chaosEl, false);
+  } else {
+    setHidden(chaosEl, true);
+  }
 
   // Instructions fade out after 5 seconds (non-blocking)
   if (state === GameState.PLAYING && instructionsEl){
@@ -1891,23 +2139,32 @@ function render(){
 }
 
 function drawBody(b){
+  const vr = b.r * (b.renderScale ?? 1);
   // Shadow
   ctx.fillStyle = 'rgba(0,0,0,.28)';
   ctx.beginPath();
-  ctx.ellipse(b.x, b.y + b.r * 0.85, b.r * 0.95, b.r * 0.45, 0, 0, Math.PI * 2);
+  ctx.ellipse(b.x, b.y + vr * 0.85, vr * 0.95, vr * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Body (special case: characters use local sticker images for display only)
+  const imgReady = (img) => !!img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
   let stickerImg = null;
   if (b === ofer) stickerImg = oferStickerImg;
   else if (b === mushu) stickerImg = mushuStickerImg;
-  else if (b === tal) stickerImg = talStickerImg;
+  else if (b === tal){
+    // Swap Tal sticker during "Bride Rage" chaos.
+    const stageIndex = (world?.stageIndex ?? 0);
+    const preferred = (world?.brideRage && stageIndex === 1) ? brideRageOneImg
+      : (world?.brideRage && stageIndex === 2) ? brideRageTwoImg
+        : talStickerImg;
+    stickerImg = imgReady(preferred) ? preferred : talStickerImg;
+  }
 
-  const stickerReady = !!stickerImg && stickerImg.complete && stickerImg.naturalWidth > 0 && stickerImg.naturalHeight > 0;
+  const stickerReady = imgReady(stickerImg);
   if (stickerReady){
     ctx.save();
     // Scale sticker relative to body radius, preserve aspect ratio.
-    const targetW = b.r * 3.0;
+    const targetW = vr * 3.0;
     const scale = targetW / stickerImg.naturalWidth;
     const dw = stickerImg.naturalWidth * scale;
     const dh = stickerImg.naturalHeight * scale;
@@ -1915,13 +2172,13 @@ function drawBody(b){
     ctx.drawImage(stickerImg, b.x - dw / 2, b.y - dh / 2, dw, dh);
     ctx.restore();
   } else {
-    const g = ctx.createRadialGradient(b.x - b.r * 0.35, b.y - b.r * 0.35, 2, b.x, b.y, b.r * 1.2);
+    const g = ctx.createRadialGradient(b.x - vr * 0.35, b.y - vr * 0.35, 2, b.x, b.y, vr * 1.2);
     g.addColorStop(0, 'rgba(255,255,255,.18)');
     g.addColorStop(0.25, b.color);
     g.addColorStop(1, 'rgba(0,0,0,.2)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    ctx.arc(b.x, b.y, vr, 0, Math.PI * 2);
     ctx.fill();
 
     // Outline
@@ -1932,21 +2189,21 @@ function drawBody(b){
 
   // Stolen ring overlay: make it obvious Mushu has the rings.
   if (b === mushu && mushu.hasRings){
-    drawStolenRingOnMushu(b);
+    drawStolenRingOnMushu(b, vr);
   }
 
   // Label
-  drawLabel(b.label, b.x, b.y - b.r - 2);
+  drawLabel(b.label, b.x, b.y - vr - 2);
 }
 
-function drawStolenRingOnMushu(b){
+function drawStolenRingOnMushu(b, vr){
   // Designed to sit near Mushu's mouth/paw regardless of sticker aspect.
   const t = world.t || 0;
-  const bob = Math.sin(t * 10.5) * (b.r * 0.04);
+  const bob = Math.sin(t * 10.5) * (vr * 0.04);
   // Bottom-left placement (looks like it's "held"/dragged).
-  const x = b.x - b.r * 0.66;
-  const y = b.y + b.r * 0.78 + bob;
-  const size = Math.max(8, b.r * 0.46);
+  const x = b.x - vr * 0.66;
+  const y = b.y + vr * 0.78 + bob;
+  const size = Math.max(8, vr * 0.46);
   const ang = 0.75 + Math.sin(t * 7.0) * 0.10;
   drawRingIcon(x, y, size, ang);
 }
@@ -2117,6 +2374,7 @@ function showOutcome(reason){
   const stageLabel = `שלב ${stageNum(world.stageIndex)} מתוך ${STAGES.length}`;
   endTitleEl.textContent = reason === 'ALL_CLEAR' ? o.title : `${o.title} • ${stageLabel}`;
   endTextEl.textContent = o.text;
+  renderEndScore();
 }
 
 // =============================
@@ -2130,8 +2388,10 @@ function enterIdle(){
   setHidden(stageUI, true);
   setQuip('');
   if (instructionsEl) instructionsEl.style.opacity = '0';
-  chaosEl.textContent = 'כאוס: רגוע(בערך)';
-  timerEl.textContent = `${DEFAULT_GAME_DURATION.toFixed(1)}ש׳`;
+  chaosEl.textContent = '';
+  setHidden(chaosEl, true);
+  const idleDur = (getStageCfg(StageId.STAGE_1)?.durationSec ?? DEFAULT_GAME_DURATION);
+  timerEl.textContent = `${idleDur.toFixed(1)}ש׳`;
   world.playEnabled = false;
   world.stageIndex = StageId.STAGE_1;
   applyStageParams(getStageCfg(StageId.STAGE_1));
