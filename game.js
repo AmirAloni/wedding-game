@@ -78,6 +78,53 @@ rightSpeakerImg.decoding = 'async';
 rightSpeakerImg.loading = 'eager';
 rightSpeakerImg.src = 'assets/right-speaker.webp';
 
+// Stage 3 (chuppah) props
+const levelThreeBgImg = new Image();
+levelThreeBgImg.decoding = 'async';
+levelThreeBgImg.loading = 'eager';
+levelThreeBgImg.src = 'assets/level-three-backgroung.jpeg';
+levelThreeBgImg.addEventListener('load', () => { bgCache = null; }, { once: true });
+
+const hupaImg = new Image();
+hupaImg.decoding = 'async';
+hupaImg.loading = 'eager';
+hupaImg.src = 'assets/hupa.png';
+
+const fountainImg = new Image();
+fountainImg.decoding = 'async';
+fountainImg.loading = 'eager';
+fountainImg.src = 'assets/fountain.png';
+
+const whiteCarpetImg = new Image();
+whiteCarpetImg.decoding = 'async';
+whiteCarpetImg.loading = 'eager';
+whiteCarpetImg.src = 'assets/white-carpet.jpg';
+
+const whiteFlowersImg = new Image();
+whiteFlowersImg.decoding = 'async';
+whiteFlowersImg.loading = 'eager';
+whiteFlowersImg.src = 'assets/white-flowers.png';
+
+const whiteTreeImg = new Image();
+whiteTreeImg.decoding = 'async';
+whiteTreeImg.loading = 'eager';
+whiteTreeImg.src = 'assets/white-tree.png';
+
+const pinkTreeImg = new Image();
+pinkTreeImg.decoding = 'async';
+pinkTreeImg.loading = 'eager';
+pinkTreeImg.src = 'assets/pink-tree.png';
+
+const woodStageImg = new Image();
+woodStageImg.decoding = 'async';
+woodStageImg.loading = 'eager';
+woodStageImg.src = 'assets/wood-stage.png';
+
+const briksImg = new Image();
+briksImg.decoding = 'async';
+briksImg.loading = 'eager';
+briksImg.src = 'assets/briks.png';
+
 // =============================
 // Constants (tweak here)
 // =============================
@@ -555,34 +602,22 @@ function buildBackgroundCache(){
     g.fillStyle = spot;
     g.fillRect(0, 0, w, h);
   } else if (stage === 2){
-    // Under the chuppah: blush fabric close-up.
-    const cloth = g.createLinearGradient(0, 0, 0, h);
-    cloth.addColorStop(0, '#fff3f8');
-    cloth.addColorStop(0.42, '#ffd2e7');
-    cloth.addColorStop(1, '#e9eef1');
-    g.fillStyle = cloth;
-    g.fillRect(0, 0, w, h);
+    // Stage 3: use provided background image, fallback to soft ivory gradient.
+    const drew = drawImageCover(levelThreeBgImg);
+    if (!drew){
+      const cloth = g.createLinearGradient(0, 0, 0, h);
+      cloth.addColorStop(0, '#fffaf3');
+      cloth.addColorStop(0.50, '#ffd2e7');
+      cloth.addColorStop(1, '#e9eef1');
+      g.fillStyle = cloth;
+      g.fillRect(0, 0, w, h);
 
-    // Fabric stripes.
-    g.fillStyle = 'rgba(255,255,255,0.18)';
-    for (let i = -3; i < 10; i++){
-      const x = (i * w) / 8;
-      g.save();
-      g.translate(x, 0);
-      g.rotate(-0.12);
-      g.fillRect(0, -h * 0.2, w * 0.12, h * 1.6);
-      g.restore();
+      const vig = g.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.16, w * 0.5, h * 0.55, Math.max(w, h) * 0.95);
+      vig.addColorStop(0, 'rgba(255,255,255,0)');
+      vig.addColorStop(1, 'rgba(18,49,28,0.14)');
+      g.fillStyle = vig;
+      g.fillRect(0, 0, w, h);
     }
-
-    // Soft floral corners.
-    drawBed(g, w * 0.14, h * 0.22, Math.min(w, h) * 0.16, Math.min(w, h) * 0.11);
-    drawBed(g, w * 0.86, h * 0.24, Math.min(w, h) * 0.16, Math.min(w, h) * 0.11);
-
-    const vig = g.createRadialGradient(w * 0.5, h * 0.5, Math.min(w, h) * 0.18, w * 0.5, h * 0.5, Math.max(w, h) * 0.88);
-    vig.addColorStop(0, 'rgba(255,255,255,0)');
-    vig.addColorStop(1, 'rgba(18,49,28,0.12)');
-    g.fillStyle = vig;
-    g.fillRect(0, 0, w, h);
   } else {
     // Yard (Stage 1): use provided background image, fallback to gradient if not loaded yet.
     const drew = drawImageCover(levelOneBgImg);
@@ -1020,6 +1055,32 @@ function buildObstacles(){
     obstacles.push({ kind: 'circle', type: 'pole', x, y, r });
   }
 
+  function addCarpet(nx, y, nW, nH){
+    const cw = clamp(w * nW, 110, 200);
+    const ch = clamp(h * nH, 220, h);
+    const x = clamp(w * nx - cw / 2, left, right - cw);
+    const yy = clamp(y, top, bottom - ch);
+    obstacles.push({ kind: 'rect', type: 'carpet', x, y: yy, w: cw, h: ch, r: 18, solid: false });
+    return { x, y: yy, w: cw, h: ch };
+  }
+
+  function addRect(type, nx, ny, nW, nH, { solid } = {}){
+    const rw = clamp(w * nW, 120, 360);
+    const rh = clamp(h * nH, 70, 320);
+    const x = clamp(w * nx - rw / 2, left, right - rw);
+    const y = clamp(h * ny - rh / 2, top, bottom - rh);
+    obstacles.push({ kind: 'rect', type, x, y, w: rw, h: rh, r: 18, solid: solid !== false });
+    return { x, y, w: rw, h: rh };
+  }
+
+  function addImgCircle(type, nx, ny, nr, { solid } = {}){
+    const r = clamp(Math.min(w, h) * nr, 18, 68);
+    const x = clamp(w * nx, left + r, right - r);
+    const y = clamp(h * ny, top + r, bottom - r);
+    obstacles.push({ kind: 'circle', type, x, y, r, solid: solid !== false });
+    return { x, y, r };
+  }
+
   // Stage-specific layouts (yard / hall / under the chuppah)
   if (stage === 0){
     // Yard: no chuppah, no bed. Add garden props.
@@ -1091,14 +1152,82 @@ function buildObstacles(){
     addTableWithChairs(clamp(w * 0.26, left + tableR + 18, right - tableR - 18), row2Y, 5);
     addTableWithChairs(clamp(w * 0.74, left + tableR + 18, right - tableR - 18), row2Y, 5);
   } else {
-    // Under the chuppah: giant canopy + poles, minimal clutter.
-    addChuppah(0.50, 0.14, 0.72, 0.20);
-    addPole(0.20, 0.26);
-    addPole(0.80, 0.26);
-    addPole(0.24, 0.58);
-    addPole(0.76, 0.58);
-    // "Ring stand" (fountain) as a comedic hazard.
-    addFountain(0.50, 0.56);
+    // Stage 3 (chuppah): hupa + fountains at top, carpet path (passable), everything else blocks.
+    const S3 = 0.81; // global 19% scale for ALL stage-3 props (not characters)
+    const hupaDraw = addRect('hupa', 0.50, 0.22, 0.44 * S3, 0.22 * S3);
+    // Shrink collision a bit so it "feels" like the legs/area, not the whole transparent PNG.
+    const ho = obstacles[obstacles.length - 1];
+    ho.drawX = hupaDraw.x;
+    ho.drawY = hupaDraw.y;
+    ho.drawW = hupaDraw.w;
+    ho.drawH = hupaDraw.h;
+    ho.x += ho.w * 0.10;
+    ho.w *= 0.80;
+    ho.y += ho.h * 0.30;
+    ho.h *= 0.66;
+    // Chuppah is visual-only: pass-through.
+    ho.solid = false;
+
+    function tuneStage3CircleCollision(o, { mul, yShiftFrac }){
+      // Keep drawing anchored to original position/size, but collision uses adjusted circle.
+      o.drawX = o.x;
+      o.drawY = o.y;
+      o.drawR = o.r;
+      o.r *= (mul ?? 1);
+      if (yShiftFrac) o.y += o.r * yShiftFrac;
+    }
+
+    // Place fountains flanking the hupa.
+    addImgCircle('fountain', 0.50 - 0.30, 0.25, 0.055 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.90, yShiftFrac: 0 });
+    addImgCircle('fountain', 0.50 + 0.30, 0.25, 0.055 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.90, yShiftFrac: 0 });
+
+    // Carpet continues down from the hupa area (PASSABLE).
+    const hupaBottomY = (ho.drawY ?? ho.y) + (ho.drawH ?? ho.h);
+    const carpetGap = 0; // carpet should be flush with the chuppah
+    // Allow the carpet to start as high as needed; add a tiny overlap to avoid a visible seam.
+    const seamFix = Math.max(1, Math.round((window.devicePixelRatio || 1) * 2));
+    const carpetTop = clamp((hupaBottomY + carpetGap) - seamFix, top, bottom - 220);
+    const carpet = addCarpet(0.50, carpetTop, 0.22 * S3, 0.78 * S3);
+
+    // Big blockers on the sides to frame the carpet.
+    addImgCircle('palmTree', 0.14, 0.14, 0.095 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
+    addImgCircle('palmTree', 0.86, 0.14, 0.095 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
+
+    // Pink trees: draw them slightly OUTSIDE the screen edges (visual), keep collision inside bounds.
+    addImgCircle('pinkTree', 0.08, 0.60, 0.110 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    obstacles[obstacles.length - 1].drawX = w * -0.01;
+    addImgCircle('pinkTree', 0.92, 0.58, 0.110 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    obstacles[obstacles.length - 1].drawX = w * 1.01;
+
+    // Symmetric bushes along the carpet: two columns, white–pink–white.
+    const colGap = clamp(Math.min(w, h) * 0.085, 34, 64);
+    const colPad = 22;
+    const leftColX = clamp(carpet.x - colGap, left + colPad, right - colPad);
+    const rightColX = clamp(carpet.x + carpet.w + colGap, left + colPad, right - colPad);
+    // Keep them closer together along the carpet.
+    const y0 = carpet.y + carpet.h * 0.34;
+    const y1 = carpet.y + carpet.h * 0.50;
+    const y2 = carpet.y + carpet.h * 0.66;
+    const rWhite = clamp(Math.min(w, h) * 0.050, 18, 40) * S3;
+    const rPink = clamp(Math.min(w, h) * 0.055, 18, 42) * S3;
+    for (const x of [leftColX, rightColX]){
+      obstacles.push({ kind: 'circle', type: 'whiteFlowers', x, y: y0, r: rWhite });
+      tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.25, yShiftFrac: 0.00 });
+      obstacles.push({ kind: 'circle', type: 'bush', x, y: y1, r: rPink });
+      tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.30, yShiftFrac: 0.00 });
+      obstacles.push({ kind: 'circle', type: 'whiteFlowers', x, y: y2, r: rWhite });
+      tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.25, yShiftFrac: 0.00 });
+    }
+
+    // Wooden stage + briks: bottom corners as solid scenery.
+    addRect('woodStage', 0.22, 0.86, 0.30 * S3, 0.23 * S3);
+    addImgCircle('briks', 0.82, 0.86, 0.120 * S3, { solid: false });
   }
 }
 
@@ -1876,6 +2005,64 @@ function render(){
         const cx = o.x + o.w / 2;
         const cy = o.y + o.h / 2;
         if (drawImgContain(ctx, img, cx, cy, o.w * 1.5, o.h * 1.5, 'center')) continue;
+      }
+    }
+
+    // Stage 3 (chuppah): render prop images. (Only the carpet is passable; everything else is solid.)
+    if (stageIndex === 2){
+      if (o.type === 'carpet'){
+        // Draw as a tall strip, centered in its rect.
+        const cx = o.x + o.w / 2;
+        const cy = o.y + o.h / 2;
+        ctx.save();
+        ctx.globalAlpha = 0.92;
+        // Draw exactly to the rect to keep it flush to the chuppah.
+        if (drawImgContain(ctx, whiteCarpetImg, cx, cy, o.w, o.h, 'center')){ ctx.restore(); continue; }
+        ctx.restore();
+      } else if (o.type === 'hupa'){
+        const dx = (o.drawX ?? o.x);
+        const dy = (o.drawY ?? o.y);
+        const dw = (o.drawW ?? o.w);
+        const dh = (o.drawH ?? o.h);
+        const cx = dx + dw / 2;
+        const by = dy + dh;
+        if (drawImgContain(ctx, hupaImg, cx, by, dw * 1.25, dh * 1.25, 'bottom')) continue;
+      } else if (o.type === 'fountain'){
+        const dx = (o.drawX ?? o.x);
+        const dy = (o.drawY ?? o.y);
+        const dr = (o.drawR ?? o.r);
+        if (drawImgContain(ctx, fountainImg, dx, dy, dr * 4.2, dr * 4.2, 'center')) continue;
+      } else if (o.type === 'whiteTree'){
+        const dx = (o.drawX ?? o.x);
+        const dy = (o.drawY ?? o.y);
+        const dr = (o.drawR ?? o.r);
+        if (drawImgContain(ctx, whiteTreeImg, dx, dy, dr * 5.0, dr * 6.3, 'center')) continue;
+      } else if (o.type === 'palmTree'){
+        const dx = (o.drawX ?? o.x);
+        const dy = (o.drawY ?? o.y);
+        const dr = (o.drawR ?? o.r);
+        if (drawImgContain(ctx, palmTreeImg, dx, dy, dr * 5.2, dr * 6.8, 'center')) continue;
+      } else if (o.type === 'pinkTree'){
+        const dx = (o.drawX ?? o.x);
+        const dy = (o.drawY ?? o.y);
+        const dr = (o.drawR ?? o.r);
+        if (drawImgContain(ctx, pinkTreeImg, dx, dy, dr * 5.2, dr * 6.6, 'center')) continue;
+      } else if (o.type === 'bush'){
+        const dx = (o.drawX ?? o.x);
+        const dy = (o.drawY ?? o.y);
+        const dr = (o.drawR ?? o.r);
+        if (drawImgContain(ctx, pinkBushImg, dx, dy, dr * 2.8, dr * 2.55, 'center')) continue;
+      } else if (o.type === 'whiteFlowers'){
+        const dx = (o.drawX ?? o.x);
+        const dy = (o.drawY ?? o.y);
+        const dr = (o.drawR ?? o.r);
+        if (drawImgContain(ctx, whiteFlowersImg, dx, dy, dr * 3.4, dr * 2.9, 'center')) continue;
+      } else if (o.type === 'woodStage'){
+        const cx = o.x + o.w / 2;
+        const cy = o.y + o.h / 2;
+        if (drawImgContain(ctx, woodStageImg, cx, cy, o.w * 1.35, o.h * 1.35, 'center')) continue;
+      } else if (o.type === 'briks'){
+        if (drawImgContain(ctx, briksImg, o.x, o.y, o.r * 4.0, o.r * 4.0, 'center')) continue;
       }
     }
 
