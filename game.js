@@ -156,6 +156,8 @@ const ctx = canvas.getContext('2d', { alpha: false });
 let bgCache = null;
 
 const startUI = document.getElementById('startUI');
+const startUIDemoPanel = document.getElementById('startUI-demoPanel');
+const startUIDemoViewport = document.getElementById('startUI-demoViewport');
 const endUI = document.getElementById('endUI');
 const rotateUI = document.getElementById('rotateUI');
 const stageUI = document.getElementById('stageUI');
@@ -175,6 +177,11 @@ const stageCountdownEl = document.getElementById('stageCountdown');
 const stageTinyEl = document.getElementById('stageTiny');
 const endScoreEl = document.getElementById('endScore');
 
+// On-screen joystick (movement)
+const joystickEl = document.getElementById('joystick');
+const joystickBaseEl = document.getElementById('joystickBase');
+const joystickKnobEl = document.getElementById('joystickKnob');
+
 // =============================
 // State machine (MANDATORY)
 // IDLE → PLAYING → END → PLAYING
@@ -187,6 +194,7 @@ const GameState = Object.freeze({
 
 let state = GameState.IDLE;
 let rafId = 0;
+let demoRafId = 0;
 
 // =============================
 // Stage system (3 stages, sequential)
@@ -205,7 +213,7 @@ const STAGES = [
     place: 'בחצר',
     punch: 'תוכיח שאתה לא רק חתן בתמונות.',
     howTo: [
-      'גוררים אצבע = עופר 🤵 זז כמו מגנט על סקטבורד.',
+      'מזיזים את הג׳ויסטיק = עופר 🤵 זז כמו מגנט על סקטבורד.',
       'המטרה: לתפוס את מושו 🐶 לפני שהטיימר נגמר.',
       'שולחנות/כיסאות/עצים/שיחים: לא עוברים דרכם. כן, זה אישי.',
     ].join('\n'),
@@ -357,6 +365,7 @@ function setQuip(text, ms){
 function showStageOverlay(cfg, mode){
   overlayMode = mode;
   setHidden(stageUI, false);
+  setJoystickHidden(true);
   stageTitleEl.textContent = `שלב ${stageNum(pendingStageIndex)} (${cfg.place || 'איפשהו'}): ${cfg.name}`;
   if (mode === 'howto'){
     stageTextEl.textContent = cfg.howTo;
@@ -740,72 +749,250 @@ function syncWorldToCanvasSize(){
 }
 
 // =============================
-// Touch input (drag to steer)
+// On-screen joystick input (pointer)
 // =============================
-const input = {
+const joystick = {
   active: false,
-  id: null,
-  x: 0,
-  y: 0,
-  prevX: 0,
-  prevY: 0,
-  dx: 0,
-  dy: 0,
-  justDown: false,
+  pointerId: null,
+  x: 0, // normalized [-1..1]
+  y: 0, // normalized [-1..1]
 };
 
-function canvasPointFromTouch(t){
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  return {
-    x: (t.clientX - rect.left) * dpr,
-    y: (t.clientY - rect.top) * dpr,
-  };
+function setJoystickHidden(hidden){
+  if (!joystickEl) return;
+  joystickEl.classList.toggle('isHidden', !!hidden);
 }
 
-function onTouchStart(e){
-  if (state === GameState.IDLE) return; // ignore; UI handles start
-  if (state === GameState.END) return;  // overlay handles restart
-  if (!world.playEnabled) return;       // stage intro / between stages
-  const t = e.changedTouches[0];
-  input.active = true;
-  input.id = t.identifier;
-  const p = canvasPointFromTouch(t);
-  input.x = input.prevX = p.x;
-  input.y = input.prevY = p.y;
-  input.dx = input.dy = 0;
-  input.justDown = true;
-}
-
-function onTouchMove(e){
-  if (!input.active) return;
-  for (let i = 0; i < e.changedTouches.length; i++){
-    const t = e.changedTouches[i];
-    if (t.identifier !== input.id) continue;
-    const p = canvasPointFromTouch(t);
-    input.prevX = input.x; input.prevY = input.y;
-    input.x = p.x; input.y = p.y;
-    input.dx = input.x - input.prevX;
-    input.dy = input.y - input.prevY;
-    break;
+function resetJoystickVisual(){
+  joystick.active = false;
+  joystick.pointerId = null;
+  joystick.x = 0;
+  joystick.y = 0;
+  if (joystickKnobEl){
+    joystickKnobEl.style.transition = 'transform 90ms ease-out';
+    joystickKnobEl.style.transform = 'translate(-50%, -50%)';
   }
 }
 
-function onTouchEnd(e){
-  if (!input.active) return;
-  for (let i = 0; i < e.changedTouches.length; i++){
-    if (e.changedTouches[i].identifier !== input.id) continue;
-    input.active = false;
-    input.id = null;
-    input.dx = input.dy = 0;
-    break;
+function updateJoystickFromClientPoint(clientX, clientY){
+  if (!joystickBaseEl || !joystickKnobEl) return;
+  const rect = joystickBaseEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  // Max knob travel in CSS pixels.
+  const knobR = 22; // matches .joystickKnob (44px)
+  const pad = 10;
+  const max = Math.max(10, (rect.width / 2) - knobR - pad);
+
+  let dx = clientX - cx;
+  let dy = clientY - cy;
+  const d = Math.hypot(dx, dy) || 1;
+  if (d > max){
+    const s = max / d;
+    dx *= s;
+    dy *= s;
+  }
+
+  joystick.x = clamp(dx / max, -1, 1);
+  joystick.y = clamp(dy / max, -1, 1);
+
+  joystickKnobEl.style.transform = `translate(-50%, -50%) translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`;
+}
+
+function onJoystickPointerDown(e){
+  const allowed = state === GameState.PLAYING && world.playEnabled || state === GameState.IDLE;
+  if (!allowed) return;
+  if (!joystickBaseEl || !joystickKnobEl) return;
+  if (joystick.active) return;
+
+  joystick.active = true;
+  joystick.pointerId = e.pointerId;
+  joystickKnobEl.style.transition = 'none';
+
+  joystickBaseEl.setPointerCapture?.(e.pointerId);
+  updateJoystickFromClientPoint(e.clientX, e.clientY);
+}
+
+function onJoystickPointerMove(e){
+  if (!joystick.active) return;
+  if (e.pointerId !== joystick.pointerId) return;
+  updateJoystickFromClientPoint(e.clientX, e.clientY);
+}
+
+function onJoystickPointerUp(e){
+  if (!joystick.active) return;
+  if (e.pointerId !== joystick.pointerId) return;
+  resetJoystickVisual();
+}
+
+if (joystickBaseEl){
+  joystickBaseEl.addEventListener('pointerdown', onJoystickPointerDown, { passive: true });
+  joystickBaseEl.addEventListener('pointermove', onJoystickPointerMove, { passive: true });
+  joystickBaseEl.addEventListener('pointerup', onJoystickPointerUp, { passive: true });
+  joystickBaseEl.addEventListener('pointercancel', onJoystickPointerUp, { passive: true });
+}
+
+// =============================
+// Demo on start screen: joystick moves Ofer, catch Mushu
+// =============================
+const demoOfer = { x: 0, y: 0, vx: 0, vy: 0, r: 22 };
+const demoMushu = { x: 0, y: 0, vx: 0, vy: 0, r: 18 };
+let demoCaught = false;
+let demoResetAt = 0;
+const DEMO_CATCH_SHOW_SEC = 1.8;
+
+function initDemoPositions(){
+  const w = canvas.width || 400;
+  const h = canvas.height || 700;
+  const m = 40;
+  demoOfer.x = w * 0.5;
+  demoOfer.y = h * 0.78;
+  demoOfer.vx = 0;
+  demoOfer.vy = 0;
+  demoMushu.x = w * 0.5;
+  demoMushu.y = h * 0.35;
+  demoMushu.vx = 45;
+  demoMushu.vy = 30;
+  demoCaught = false;
+  demoResetAt = 0;
+}
+
+function updateDemo(dt){
+  if (demoCaught){
+    if (nowSec() >= demoResetAt) {
+      demoCaught = false;
+      initDemoPositions();
+    }
+    return;
+  }
+
+  // Steer demo Ofer from joystick (same logic as steerOfer)
+  if (joystick.active){
+    let x = joystick.x;
+    let y = joystick.y;
+    const m = Math.hypot(x, y);
+    const dead = 0.12;
+    if (m > dead){
+      const strength = clamp((m - dead) / (1 - dead), 0, 1);
+      const inv = 1 / (m || 1);
+      x *= inv;
+      y *= inv;
+      const accel = 2000;
+      demoOfer.vx += x * accel * strength * dt;
+      demoOfer.vy += y * accel * strength * dt;
+    }
+  }
+
+  demoOfer.vx *= 0.92;
+  demoOfer.vy *= 0.92;
+  demoOfer.x += demoOfer.vx * dt;
+  demoOfer.y += demoOfer.vy * dt;
+
+  // Mushu wanders slowly
+  demoMushu.x += demoMushu.vx * dt;
+  demoMushu.y += demoMushu.vy * dt;
+  const w = canvas.width || 400;
+  const h = canvas.height || 700;
+  const margin = 50;
+  if (demoMushu.x < margin || demoMushu.x > w - margin) demoMushu.vx *= -1;
+  if (demoMushu.y < margin || demoMushu.y > h - margin) demoMushu.vy *= -1;
+  demoMushu.x = clamp(demoMushu.x, margin, w - margin);
+  demoMushu.y = clamp(demoMushu.y, margin, h - margin);
+
+  const m = ARENA_MARGIN;
+  demoOfer.x = clamp(demoOfer.x, m + demoOfer.r, w - m - demoOfer.r);
+  demoOfer.y = clamp(demoOfer.y, m + demoOfer.r, h - m - demoOfer.r);
+
+  const rr = demoOfer.r + demoMushu.r;
+  if (dist2(demoOfer.x, demoOfer.y, demoMushu.x, demoMushu.y) <= rr * rr){
+    demoCaught = true;
+    demoResetAt = nowSec() + DEMO_CATCH_SHOW_SEC;
   }
 }
 
-canvas.addEventListener('touchstart', onTouchStart, { passive: true });
-canvas.addEventListener('touchmove', onTouchMove, { passive: true });
-canvas.addEventListener('touchend', onTouchEnd, { passive: true });
-canvas.addEventListener('touchcancel', onTouchEnd, { passive: true });
+function renderDemo(){
+  const w = canvas.width;
+  const h = canvas.height;
+  if (!w || !h) return;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const lawn = ctx.createRadialGradient(
+    w * 0.5, h * 0.2, Math.min(w, h) * 0.1,
+    w * 0.5, h * 0.5, Math.max(w, h) * 0.8
+  );
+  lawn.addColorStop(0, '#b9e56f');
+  lawn.addColorStop(0.5, '#6fd07f');
+  lawn.addColorStop(1, '#2f8d52');
+  ctx.fillStyle = lawn;
+  ctx.fillRect(0, 0, w, h);
+
+  if (demoCaught){
+    ctx.font = '900 32px ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,250,243,.95)';
+    ctx.strokeStyle = 'rgba(18,49,28,.5)';
+    ctx.lineWidth = 6;
+    const msg = 'תפסת! 🎉';
+    ctx.strokeText(msg, w / 2, h / 2);
+    ctx.fillText(msg, w / 2, h / 2);
+    return;
+  }
+
+  // Draw Mushu then Ofer (same drawBody style, simplified)
+  function drawDemoBody(b, label, color){
+    const vr = b.r * 1.3;
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y + vr * 0.85, vr * 0.95, vr * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const img = (b === demoOfer) ? oferStickerImg : mushuStickerImg;
+    if (isImgReady(img)){
+      const targetW = vr * 3.0;
+      const scale = targetW / img.naturalWidth;
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      ctx.drawImage(img, b.x - dw / 2, b.y - dh / 2, dw, dh);
+    } else {
+      const g = ctx.createRadialGradient(b.x - vr * 0.35, b.y - vr * 0.35, 2, b.x, b.y, vr * 1.2);
+      g.addColorStop(0, 'rgba(255,255,255,.18)');
+      g.addColorStop(0.25, color);
+      g.addColorStop(1, 'rgba(0,0,0,.2)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, vr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.16)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.font = '800 14px ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = 'rgba(255,250,243,.85)';
+    ctx.fillText(label, b.x, b.y - vr - 4);
+  }
+
+  drawDemoBody(demoMushu, 'מושו 🐶', '#ff4fd8');
+  drawDemoBody(demoOfer, 'עופר 🤵', '#3cffb0');
+}
+
+function demoLoop(){
+  if (state !== GameState.IDLE){
+    demoRafId = 0;
+    return;
+  }
+  const t = nowSec();
+  if (!demoLoop.lastT) demoLoop.lastT = t;
+  const dt = clamp(t - demoLoop.lastT, 0, 1 / 30);
+  demoLoop.lastT = t;
+
+  updateDemo(dt);
+  renderDemo();
+
+  demoRafId = requestAnimationFrame(demoLoop);
+}
 
 // =============================
 // Web Audio (unlocked on user tap)
@@ -1442,15 +1629,13 @@ function resetGameToPlaying(stageIndex){
 
   particles.length = 0;
 
-  input.active = false;
-  input.id = null;
-  input.dx = input.dy = 0;
-  input.justDown = false;
+  resetJoystickVisual();
 
   state = GameState.PLAYING;
   setHidden(endUI, true);
   setHidden(startUI, true);
   setHidden(stageUI, true);
+  setJoystickHidden(false);
 }
 
 function enterEnd(reason){
@@ -1460,6 +1645,8 @@ function enterEnd(reason){
   setHidden(endUI, false);
   setHidden(startUI, true);
   setHidden(stageUI, true);
+  setJoystickHidden(true);
+  resetJoystickVisual();
   if (instructionsEl) instructionsEl.style.opacity = '0';
   // Keep the last frame behind the overlay (no more simulation needed).
   // We still render one more time for "freeze-frame drama".
@@ -1615,20 +1802,24 @@ function applyDrag(body, dt, base){
 }
 
 function steerOfer(dt){
-  if (!input.active) return;
-  // Drag steering: Ofer follows your finger like a magnet on a skateboard.
-  const tx = input.x;
-  const ty = input.y;
-  const dx = (tx - ofer.x);
-  const dy = (ty - ofer.y);
+  if (!joystick.active) return;
 
-  // Spring acceleration + a little "finger impulse" from drag delta.
-  const ax = (dx * 5.5 + input.dx * 18);
-  const ay = (dy * 5.5 + input.dy * 18);
+  // Joystick steering: analog direction + strength (with a small deadzone).
+  let x = joystick.x;
+  let y = joystick.y;
+  const m = Math.hypot(x, y);
+  const dead = 0.12;
+  if (m <= dead) return;
+
+  const strength = clamp((m - dead) / (1 - dead), 0, 1);
+  const eased = Math.pow(strength, 1.15);
+  const inv = 1 / (m || 1);
+  x *= inv;
+  y *= inv;
 
   const accel = (world.params?.playerSpeed ?? 2400);
-  ofer.vx += clamp(ax, -accel, accel) * dt;
-  ofer.vy += clamp(ay, -accel, accel) * dt;
+  ofer.vx += x * accel * eased * dt;
+  ofer.vy += y * accel * eased * dt;
 }
 
 function updateMushuAI(dt){
@@ -2573,6 +2764,11 @@ function enterIdle(){
   setHidden(endUI, true);
   setHidden(rotateUI, true);
   setHidden(stageUI, true);
+  setJoystickHidden(false);
+  if (canvas && startUIDemoViewport) startUIDemoViewport.appendChild(canvas);
+  if (joystickEl && startUIDemoPanel) startUIDemoPanel.appendChild(joystickEl);
+  if (joystickEl) joystickEl.classList.add('joystick--onStart');
+  resetJoystickVisual();
   setQuip('');
   if (instructionsEl) instructionsEl.style.opacity = '0';
   chaosEl.textContent = '';
@@ -2582,12 +2778,29 @@ function enterIdle(){
   world.playEnabled = false;
   world.stageIndex = StageId.STAGE_1;
   applyStageParams(getStageCfg(StageId.STAGE_1));
+  resizeCanvas();
+  initDemoPositions();
+  demoLoop.lastT = 0;
+  if (demoRafId) cancelAnimationFrame(demoRafId);
+  demoRafId = requestAnimationFrame(demoLoop);
 }
 
 startBtn.addEventListener('click', async () => {
   // Unlock audio ONLY after user interaction (MANDATORY).
   await ensureAudioUnlocked();
   audio.sfx.start();
+
+  if (demoRafId) {
+    cancelAnimationFrame(demoRafId);
+    demoRafId = 0;
+  }
+  if (joystickEl) joystickEl.classList.remove('joystick--onStart');
+  const appEl = document.getElementById('app');
+  if (canvas && startUIDemoViewport && canvas.parentNode === startUIDemoViewport && appEl) {
+    appEl.insertBefore(canvas, appEl.firstChild);
+  }
+  if (joystickEl && appEl) appEl.appendChild(joystickEl);
+  setJoystickHidden(false);
 
   // Start immediately (no how-to overlay, no countdown).
   state = GameState.PLAYING;
@@ -2610,8 +2823,10 @@ restartBtn.addEventListener('click', async () => {
 }, { passive: true });
 
 window.addEventListener('resize', () => {
-  if (state !== GameState.IDLE){
-    resizeCanvas();
+  resizeCanvas();
+  if (state === GameState.IDLE){
+    initDemoPositions();
+  } else {
     syncWorldToCanvasSize();
   }
 }, { passive: true });

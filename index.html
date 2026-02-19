@@ -11,23 +11,28 @@
     <main id="app" aria-label="המשחק כאוס חתונה">
       <canvas id="game" aria-label="משטח המשחק"></canvas>
 
-      <!-- IDLE UI -->
-      <section id="startUI" class="overlay overlay--center" aria-label="מסך פתיחה">
-        <div class="panel">
+      <!-- IDLE UI: title + explanations, then demo panel, then start button -->
+      <section id="startUI" class="overlay overlay--start" aria-label="מסך פתיחה">
+        <div class="startUI-background">
           <div class="title">כאוס חתונה</div>
           <div class="subtitle">תתפסו את מושו (🐶) לפני שהוא זורק את הטבעות לציר זמן אחר.</div>
           <div class="howto" aria-label="איך משחקים">
             <div class="howtoTitle">איך משחקים</div>
             <div class="howtoText">
-              גוררים אצבע כדי להזיז את עופר 🤵<br />
+              מזיזים את הג׳ויסטיק כדי להזיז את עופר 🤵<br />
               תופסים את מושו 🐶 לפני שנגמר הזמן
             </div>
-            <div class="gesture" aria-hidden="true">
-              <div class="gesturePhone">
-                <div class="gestureFinger"></div>
-              </div>
-            </div>
           </div>
+        </div>
+        <div id="startUI-demoPanel" class="startUI-demoPanel" aria-label="נסו את המשחק">
+          <div id="startUI-demoViewport" class="startUI-demoViewport" aria-hidden="true">
+            <!-- Canvas is moved here in IDLE so demo is clipped to panel -->
+          </div>
+          <div class="startUI-demoPanel-inner">
+            <span class="demoHint demoHint--inside">נסו כאן: הזיזו את הג׳ויסטיק ותפסו את מושו 👇</span>
+          </div>
+        </div>
+        <div class="startUI-footer">
           <button id="startBtn" class="bigBtn" type="button">מתחילים כאוס</button>
           <div class="tiny">
             מובייל בלבד • מומלץ מצב לאורך
@@ -43,6 +48,13 @@
         <div id="chaos" class="pill pill--chaos isHidden" aria-live="polite"></div>
         <div id="quip" class="quip" aria-live="polite"></div>
       </div>
+
+      <!-- On-screen joystick (movement) -->
+      <section id="joystick" class="joystick isHidden" aria-label="ג׳ויסטיק תנועה">
+        <div id="joystickBase" class="joystickBase" aria-hidden="true">
+          <div id="joystickKnob" class="joystickKnob"></div>
+        </div>
+      </section>
 
       <!-- END UI -->
       <section id="endUI" class="overlay overlay--center isHidden" aria-label="מסך סיום">
