@@ -120,11 +120,6 @@ woodStageImg.decoding = 'async';
 woodStageImg.loading = 'eager';
 woodStageImg.src = 'assets/wood-stage.png';
 
-const briksImg = new Image();
-briksImg.decoding = 'async';
-briksImg.loading = 'eager';
-briksImg.src = 'assets/briks.png';
-
 // =============================
 // Constants (tweak here)
 // =============================
@@ -220,7 +215,7 @@ const STAGES = [
     // Difficulty
     durationSec: 60,
     playerSpeed: 2800,
-    mushuBaseSpeed: 290,
+    mushuBaseSpeed: 380,
     chaosIntervalSec: 6.0,
     chaosEventMinMs: 3200,
     chaosEventMaxMs: 3600,
@@ -244,7 +239,7 @@ const STAGES = [
     intro: 'טל כבר רואה הכל. במיוחד זיעה.',
     durationSec: 40,
     playerSpeed: 2600,
-    mushuBaseSpeed: 330,
+    mushuBaseSpeed: 520,
     chaosIntervalSec: 5.0,
     chaosEventMinMs: 3800,
     chaosEventMaxMs: 4200,
@@ -252,7 +247,7 @@ const STAGES = [
     mushuBoostRange: [1.55, 2.05],
     shakeIntensity: 1.0,
     brideRageEnabled: true,
-    brideRageDurFactor: 0.8,
+    brideRageDurFactor: 1.5,
     talRage: {
       targetR: 28,
       alongK: 7.0,
@@ -269,12 +264,12 @@ const STAGES = [
     intro: 'זה השלב שבו מושו נהיה קטן-חמוד-חסין-לחוקים.',
     durationSec: 30,
     playerSpeed: 2400,
-    mushuBaseSpeed: 385,
+    mushuBaseSpeed: 580,
     chaosIntervalSec: 4.5,
     chaosEventMinMs: 4200,
     chaosEventMaxMs: 4800,
     chaosWeights: null,
-    mushuBoostRange: [1.75, 2.35],
+    mushuBoostRange: [2.8, 3.6],
     shakeIntensity: 0.85,
     brideRageEnabled: true,
     brideRageDurFactor: 1.05,
@@ -840,7 +835,7 @@ const demoOfer = { x: 0, y: 0, vx: 0, vy: 0, r: 22 };
 const demoMushu = { x: 0, y: 0, vx: 0, vy: 0, r: 18 };
 let demoCaught = false;
 let demoResetAt = 0;
-const DEMO_CATCH_SHOW_SEC = 1.8;
+const DEMO_CATCH_SHOW_SEC = 1.2; /* celebration then auto-start with 3-2-1 countdown */
 
 function initDemoPositions(){
   const w = canvas.width || 400;
@@ -858,11 +853,32 @@ function initDemoPositions(){
   demoResetAt = 0;
 }
 
+function startGameFromDemoCatch(){
+  if (demoRafId) {
+    cancelAnimationFrame(demoRafId);
+    demoRafId = 0;
+  }
+  ensureAudioUnlocked().then(() => { if (audio) audio.sfx.win(); });
+
+  if (joystickEl) joystickEl.classList.remove('joystick--onStart');
+  const appEl = document.getElementById('app');
+  if (canvas && startUIDemoViewport && canvas.parentNode === startUIDemoViewport && appEl) {
+    appEl.insertBefore(canvas, appEl.firstChild);
+  }
+  if (joystickEl && appEl) appEl.appendChild(joystickEl);
+  setJoystickHidden(false);
+
+  state = GameState.PLAYING;
+  setHidden(startUI, true);
+  hasShownStage1HowTo = true;
+  scheduleStageStart(StageId.STAGE_1, { showHowTo: false });
+  startLoopIfNeeded();
+}
+
 function updateDemo(dt){
   if (demoCaught){
     if (nowSec() >= demoResetAt) {
-      demoCaught = false;
-      initDemoPositions();
+      startGameFromDemoCatch();
     }
     return;
   }
@@ -1219,17 +1235,17 @@ function buildObstacles(){
   }
 
   function addBar(nx, ny, nW, nH){
-    // Wider/taller collision than before (hall bar should feel "solid").
-    const bw = clamp(w * nW, 180, 520);
-    const bh = clamp(h * nH, 62, 160);
+    // Wider/taller collision (hall bar is prominent).
+    const bw = clamp(w * nW, 260, 720);
+    const bh = clamp(h * nH, 90, 260);
     const x = clamp(w * nx - bw / 2, left, right - bw);
     const y = clamp(h * ny, top, bottom - bh);
     obstacles.push({ kind: 'rect', type: 'bar', x, y, w: bw, h: bh, r: 18 });
   }
 
   function addSpeaker(nx, ny, nW, nH){
-    const sw = clamp(w * nW, 48, 86);
-    const sh = clamp(h * nH, 86, 132);
+    const sw = clamp(w * nW, 56, 104);
+    const sh = clamp(h * nH, 100, 158);
     const x = clamp(w * nx - sw / 2, left, right - sw);
     const y = clamp(h * ny - sh / 2, top, bottom - sh);
     obstacles.push({ kind: 'rect', type: 'speaker', x, y, w: sw, h: sh, r: 16 });
@@ -1278,9 +1294,9 @@ function buildObstacles(){
       obstacles.push({ kind: 'circle', type: 'table', x, y, r: yardTableR });
     }
     // Space out the tables (avoid overlaps with larger radius).
-    addYardTable(0.18, 0.91);
-    addYardTable(0.50, 0.81);
-    addYardTable(0.82, 0.91);
+    addYardTable(0.18, 0.84);
+    addYardTable(0.50, 0.66);
+    addYardTable(0.82, 0.84);
 
     // Trees & bushes are solid (obstacles).
     // Stage 1 tweak: move trees slightly upward + make them larger.
@@ -1326,22 +1342,27 @@ function buildObstacles(){
     addBush(0.18, 0.44, 0.036);
     addBush(0.82, 0.42, 0.036);
   } else if (stage === 1){
-    // Hall: clean top area; bar + speakers + dance floor are up top.
-    addBar(0.50, 0.07, 0.62, 0.11);
-    addSpeaker(0.10, 0.30, 0.16, 0.22);
-    addSpeaker(0.90, 0.30, 0.16, 0.22);
+    // Hall: clean top area; bar raised high, speakers + dance floor below.
+    addBar(0.50, 0.008, 0.96, 0.22);
+    addSpeaker(0.10, 0.30, 0.20, 0.26);
+    addSpeaker(0.90, 0.30, 0.20, 0.26);
 
-    // Tables symmetric: two rows, left/right mirror (same y per row, same distance from center).
-    const row1Y = clamp(h * 0.68, top + 190, bottom - tableR - 18);
+    // Tables: upper row lowered a bit more; lower row unchanged.
+    const row1Y = clamp(h * 0.68, top + 140, bottom - tableR - 18);
     const row2Y = clamp(h * 0.84, top + 260, bottom - tableR - 18);
-    addTableWithChairs(clamp(w * 0.22, left + tableR + 18, right - tableR - 18), row1Y, 6);
-    addTableWithChairs(clamp(w * 0.78, left + tableR + 18, right - tableR - 18), row1Y, 6);
-    addTableWithChairs(clamp(w * 0.26, left + tableR + 18, right - tableR - 18), row2Y, 5);
-    addTableWithChairs(clamp(w * 0.74, left + tableR + 18, right - tableR - 18), row2Y, 5);
+    const row1LeftX = clamp(w * 0.28, left + tableR + 18, right - tableR - 18);
+    const row1RightX = clamp(w * 0.72, left + tableR + 18, right - tableR - 18);
+    const leftX = clamp(w * 0.18, left + tableR + 18, right - tableR - 18);
+    const rightX = clamp(w * 0.82, left + tableR + 18, right - tableR - 18);
+    addTableWithChairs(row1LeftX, row1Y, 6);
+    addTableWithChairs(row1RightX, row1Y, 6);
+    addTableWithChairs(leftX, row2Y, 5);
+    addTableWithChairs(rightX, row2Y, 5);
   } else {
-    // Stage 3 (chuppah): hupa + fountains at top, carpet path (passable), everything else blocks.
+    // Stage 3 (chuppah): hupa lowered, carpet raised. Chuppah drawn smaller (0.85x).
     const S3 = 0.81; // global 19% scale for ALL stage-3 props (not characters)
-    const hupaDraw = addRect('hupa', 0.50, 0.22, 0.44 * S3, 0.22 * S3);
+    const HUPA_SCALE = 0.85; // shrink chuppah in stage 3
+    const hupaDraw = addRect('hupa', 0.50, 0.30, 0.54 * S3 * HUPA_SCALE, 0.28 * S3 * HUPA_SCALE);
     // Shrink collision a bit so it "feels" like the legs/area, not the whole transparent PNG.
     const ho = obstacles[obstacles.length - 1];
     ho.drawX = hupaDraw.x;
@@ -1370,25 +1391,28 @@ function buildObstacles(){
     addImgCircle('fountain', 0.50 + 0.30, 0.25, 0.055 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.90, yShiftFrac: 0 });
 
-    // Carpet continues down from the hupa area (PASSABLE).
-    const hupaBottomY = (ho.drawY ?? ho.y) + (ho.drawH ?? ho.h);
-    const carpetGap = 0; // carpet should be flush with the chuppah
-    // Allow the carpet to start as high as needed; add a tiny overlap to avoid a visible seam.
-    const seamFix = Math.max(1, Math.round((window.devicePixelRatio || 1) * 2));
-    const carpetTop = clamp((hupaBottomY + carpetGap) - seamFix, top, bottom - 220);
-    const carpet = addCarpet(0.50, carpetTop, 0.22 * S3, 0.78 * S3);
+    // Carpet: from below chuppah down to bottom of screen (PASSABLE).
+    const carpetTop = clamp(h * 0.18, top, bottom - 220);
+    const carpetHeightFrac = Math.max(0.65, (bottom - carpetTop) / h);
+    const carpet = addCarpet(0.50, carpetTop, 0.22 * S3, carpetHeightFrac);
 
     // Big blockers on the sides to frame the carpet.
-    addImgCircle('palmTree', 0.14, 0.14, 0.095 * S3);
+    addImgCircle('palmTree', 0.20, 0.14, 0.095 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
-    addImgCircle('palmTree', 0.86, 0.14, 0.095 * S3);
+    addImgCircle('palmTree', 0.80, 0.14, 0.095 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
 
-    // Pink trees: draw them slightly OUTSIDE the screen edges (visual), keep collision inside bounds.
-    addImgCircle('pinkTree', 0.08, 0.60, 0.110 * S3);
+    // Pink trees: two rows – upper pair then lower pair; draw slightly OUTSIDE screen edges (visual), collision inside bounds.
+    addImgCircle('pinkTree', 0.08, 0.42, 0.072 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
     obstacles[obstacles.length - 1].drawX = w * -0.01;
-    addImgCircle('pinkTree', 0.92, 0.58, 0.110 * S3);
+    addImgCircle('pinkTree', 0.92, 0.40, 0.072 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    obstacles[obstacles.length - 1].drawX = w * 1.01;
+    addImgCircle('pinkTree', 0.08, 0.66, 0.072 * S3);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    obstacles[obstacles.length - 1].drawX = w * -0.01;
+    addImgCircle('pinkTree', 0.92, 0.64, 0.072 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
     obstacles[obstacles.length - 1].drawX = w * 1.01;
 
@@ -1412,9 +1436,9 @@ function buildObstacles(){
       tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.25, yShiftFrac: 0.00 });
     }
 
-    // Wooden stage + briks: bottom corners as solid scenery.
-    addRect('woodStage', 0.22, 0.86, 0.30 * S3, 0.23 * S3);
-    addImgCircle('briks', 0.82, 0.86, 0.120 * S3, { solid: false });
+    // Wooden stages: symmetric left and right (smaller), lowered, spaced further apart.
+    addRect('woodStage', 0.14, 0.88, 0.22 * S3, 0.17 * S3);
+    addRect('woodStage', 0.86, 0.88, 0.22 * S3, 0.17 * S3);
   }
 }
 
@@ -1609,6 +1633,7 @@ function resetGameToPlaying(stageIndex){
   mushu.hasRings = true;
   mushu.mood = rand(0, 1000);
   mushu.zigUntil = 0;
+  mushu.wanderUntil = 0;
 
   // Stage 1 should be Tal-free (no visual, no collisions).
   tal.visible = (world.stageIndex !== 0);
@@ -1617,7 +1642,10 @@ function resetGameToPlaying(stageIndex){
   } else if (world.stageIndex === 1){
     tal.x = w * 0.16; tal.y = h * 0.18;
   } else {
-    tal.x = w * 0.84; tal.y = h * 0.22;
+    // Stage 3: Tal starts next to Ofer (chuppah – bride beside groom).
+    const offset = (ofer.r + tal.r + 28);
+    tal.x = ofer.x - offset * 0.9;
+    tal.y = ofer.y - offset * 0.4;
   }
   tal.vx = 110; tal.vy = 30;
 
@@ -1823,75 +1851,76 @@ function steerOfer(dt){
 }
 
 function updateMushuAI(dt){
-  // Mushu: tries to flee Ofer, but occasionally does a dumb zig-zag.
+  // Mushu: purely random movement in all stages – no reaction to Ofer.
   mushu.mood += dt;
   const t = world.t;
 
-  // Zig windows
-  if (t > mushu.zigUntil && Math.random() < 0.012){
-    mushu.zigUntil = t + rand(0.35, 0.85);
+  // Periodically pick a new random wander direction (smooth but random)
+  if (!mushu.wanderUntil || t >= mushu.wanderUntil){
+    mushu.wanderUntil = t + rand(0.8, 2.2);
+    mushu.wanderAngle = rand(0, Math.PI * 2);
   }
+  const wanderStrength = 0.65 + 0.25 * Math.sin(t * 2.1 + mushu.mood * 0.7);
+  let vx = Math.cos(mushu.wanderAngle) * wanderStrength;
+  let vy = Math.sin(mushu.wanderAngle) * wanderStrength;
 
-  const flee = 1;
-  const avoidTal = world.brideRage ? 1.6 : 0.6;
-
-  // Desired direction away from Ofer
-  let vx = mushu.x - ofer.x;
-  let vy = mushu.y - ofer.y;
-  const mag = Math.hypot(vx, vy) || 1;
-  vx /= mag; vy /= mag;
-
-  // Add random zig
+  // Zig windows: short random jitter
+  if (t > mushu.zigUntil && Math.random() < 0.008){
+    mushu.zigUntil = t + rand(0.15, 0.4);
+  }
   if (t < mushu.zigUntil){
-    const zig = Math.sin((t * 13.0) + mushu.mood * 5) * 0.9;
-    const zag = Math.cos((t * 9.0) + mushu.mood * 3) * 0.6;
-    vx = vx * 0.5 + zig;
-    vy = vy * 0.5 + zag;
+    const zig = Math.sin((t * 13.0) + mushu.mood * 5) * 0.5;
+    const zag = Math.cos((t * 9.0) + mushu.mood * 3) * 0.4;
+    vx += zig;
+    vy += zag;
   }
 
-  // Avoid Tal during Bride Rage
+  // Avoid Tal during Bride Rage only (environmental, not Ofer-related)
   if (world.brideRage){
     let tx = mushu.x - tal.x;
     let ty = mushu.y - tal.y;
     const tm = Math.hypot(tx, ty) || 1;
     tx /= tm; ty /= tm;
-    vx = vx * flee + tx * avoidTal;
-    vy = vy * flee + ty * avoidTal;
+    vx += tx * 1.6;
+    vy += ty * 1.6;
+  }
+
+  // If Mushu is heading toward Ofer and close, avoid collision – steer to the other side
+  const dx = ofer.x - mushu.x;
+  const dy = ofer.y - mushu.y;
+  const distToOfer = Math.hypot(dx, dy) || 1;
+  const towardOferX = dx / distToOfer;
+  const towardOferY = dy / distToOfer;
+  const rr = mushu.r + ofer.r;
+  const approachingOfer = (vx * towardOferX + vy * towardOferY) > 0.2;
+  if (approachingOfer && distToOfer < rr * 2.2){
+    vx -= towardOferX * 1.9;
+    vy -= towardOferY * 1.9;
   }
 
   // Normalize
   const m2 = Math.hypot(vx, vy) || 1;
   vx /= m2; vy /= m2;
 
-  // Tiny continuous wobble so movement feels "alive" even without zig.
-  const wob = Math.sin((t * 6.2) + mushu.mood * 2.7) * 0.22;
-  const wob2 = Math.cos((t * 5.1) + mushu.mood * 2.1) * 0.18;
+  // Small wobble so movement feels alive
+  const wob = Math.sin((t * 6.2) + mushu.mood * 2.7) * 0.12;
+  const wob2 = Math.cos((t * 5.1) + mushu.mood * 2.1) * 0.10;
   vx += wob; vy += wob2;
-
-  // Re-normalize after wobble.
   const m3 = Math.hypot(vx, vy) || 1;
   vx /= m3; vy /= m3;
 
-  // Soft bias away from the very top of the arena so Mushu doesn't "live" up there.
-  // (This keeps gameplay visually centered without making him easier to catch.)
-  if (mushu.y < world.h * 0.26){
-    const push = clamp((world.h * 0.26 - mushu.y) / (world.h * 0.26), 0, 1);
-    vy = vy * 0.7 + 0.9 * push;
-  }
-
   // Base speed + chaos boost
   const base = (world.params?.mushuBaseSpeed ?? DEFAULT_MUSHU_BASE_SPEED);
-  const speed = (base + 110 * Math.sin(mushu.mood * 2.1)) * world.mushuBoost;
-  // Intentionally "wrong": dt scaling is slightly off for comedic slipperiness.
-  mushu.vx += vx * speed * dt * rand(0.92, 1.08);
-  mushu.vy += vy * speed * dt * rand(0.92, 1.08);
+  const speed = (base + 60 * Math.sin(mushu.mood * 2.1)) * world.mushuBoost;
+  mushu.vx += vx * speed * dt * rand(0.97, 1.03);
+  mushu.vy += vy * speed * dt * rand(0.97, 1.03);
 
-  // If he ever slows down too much, give him a small kick.
+  // If he ever slows down too much, random kick so movement stays continuous
   const v = Math.hypot(mushu.vx, mushu.vy);
-  if (v < 120){
+  if (v < 180){
     const a = rand(0, Math.PI * 2);
-    mushu.vx += Math.cos(a) * 110;
-    mushu.vy += Math.sin(a) * 110;
+    mushu.vx += Math.cos(a) * 140;
+    mushu.vy += Math.sin(a) * 140;
   }
 }
 
@@ -1944,7 +1973,7 @@ function updateTal(dt){
     tal.vx += clamp(ax, -maxA, maxA) * dt;
     tal.vy += clamp(ay, -maxA, maxA) * dt;
 
-    // Wind field (slightly wrong): pushes everyone sideways.
+    // Wind field (slightly wrong): pushes everyone sideways. Same effect on Mushu in all stages.
     const windBase = rage?.wind ?? 280;
     const wind = Math.sin(t * 9.5) * windBase;
     ofer.vx += wind * dt * 0.15;
@@ -2023,8 +2052,8 @@ function update(dt){
   // Drag + bounce
   applyDrag(ofer, dt, 0.92);
   const isMushuTurbo = world.chaosActive && world.chaosName === ChaosEvent.MUSHU_BOOST;
-  // Turbo should *feel* faster: keep more momentum (less damping).
-  applyDrag(mushu, dt, isMushuTurbo ? 0.975 : 0.955);
+  // Less drag so Mushu keeps speed and moves more continuously.
+  applyDrag(mushu, dt, isMushuTurbo ? 0.978 : 0.972);
   boundsBounce(ofer, true);
   boundsBounce(mushu, false);
 
@@ -2217,7 +2246,7 @@ function render(){
         const dh = (o.drawH ?? o.h);
         const cx = dx + dw / 2;
         const by = dy + dh;
-        if (drawImgContain(ctx, hupaImg, cx, by, dw * 1.25, dh * 1.25, 'bottom')) continue;
+        if (drawImgContain(ctx, hupaImg, cx, by, dw * 1.45, dh * 1.45, 'bottom')) continue;
       } else if (o.type === 'fountain'){
         const dx = (o.drawX ?? o.x);
         const dy = (o.drawY ?? o.y);
@@ -2252,8 +2281,6 @@ function render(){
         const cx = o.x + o.w / 2;
         const cy = o.y + o.h / 2;
         if (drawImgContain(ctx, woodStageImg, cx, cy, o.w * 1.35, o.h * 1.35, 'center')) continue;
-      } else if (o.type === 'briks'){
-        if (drawImgContain(ctx, briksImg, o.x, o.y, o.r * 4.0, o.r * 4.0, 'center')) continue;
       }
     }
 
@@ -2518,11 +2545,18 @@ function render(){
 
 function drawBody(b){
   const vr = b.r * (b.renderScale ?? 1);
+  const stageIndex = (world?.stageIndex ?? 0);
+  const talRageFx = (b === tal) && !!world?.brideRage && stageIndex === 2;
   // Shadow
   ctx.fillStyle = 'rgba(0,0,0,.28)';
   ctx.beginPath();
   ctx.ellipse(b.x, b.y + vr * 0.85, vr * 0.95, vr * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // Bride Rage (Stage 3): surround Tal with visible anger (render-only).
+  if (talRageFx){
+    drawBrideRageBackFx(b, vr);
+  }
 
   // Body (special case: characters use local sticker images for display only)
   const imgReady = (img) => !!img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
@@ -2531,7 +2565,6 @@ function drawBody(b){
   else if (b === mushu) stickerImg = mushuStickerImg;
   else if (b === tal){
     // Swap Tal sticker during "Bride Rage" chaos.
-    const stageIndex = (world?.stageIndex ?? 0);
     const preferred = (world?.brideRage && stageIndex === 1) ? brideRageOneImg
       : (world?.brideRage && stageIndex === 2) ? brideRageTwoImg
         : talStickerImg;
@@ -2563,6 +2596,11 @@ function drawBody(b){
     ctx.strokeStyle = 'rgba(255,255,255,.16)';
     ctx.lineWidth = 2;
     ctx.stroke();
+  }
+
+  // Bride Rage (Stage 3): front layer (steam/sparks) above the sticker.
+  if (talRageFx){
+    drawBrideRageFrontFx(b, vr);
   }
 
   // Stolen ring overlay: make it obvious Mushu has the rings.
@@ -2638,6 +2676,146 @@ function drawRingIcon(x, y, r, ang){
   ctx.moveTo(r * 1.35, -r * 0.45);
   ctx.lineTo(r * 1.55, -r * 0.25);
   ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawBrideRageBackFx(b, vr){
+  // Render-only: smoke aura around bride rage (stage 3).
+  const t = world.t || 0;
+  const TAU = Math.PI * 2;
+
+  ctx.save();
+  ctx.translate(b.x, b.y);
+
+  function fract(x){ return x - Math.floor(x); }
+  function hash01(x){ return fract(Math.sin(x) * 43758.5453123); }
+
+  // Base haze (soft, blurred). This is the "volume" of smoke.
+  const hazeBlur = Math.max(1, vr * 0.09);
+  ctx.filter = `blur(${hazeBlur.toFixed(2)}px)`;
+  const hazeR = vr * (2.05 + 0.10 * Math.sin(t * 1.6));
+  const haze = ctx.createRadialGradient(-vr * 0.15, -vr * 0.18, vr * 0.25, 0, 0, hazeR);
+  haze.addColorStop(0, 'rgba(26,26,30,0.40)');
+  haze.addColorStop(0.45, 'rgba(50,50,58,0.28)');
+  haze.addColorStop(0.75, 'rgba(90,90,98,0.14)');
+  haze.addColorStop(1, 'rgba(120,120,128,0)');
+  ctx.fillStyle = haze;
+  ctx.beginPath();
+  ctx.arc(0, 0, hazeR, 0, TAU);
+  ctx.fill();
+
+  // Dense puffs around the body (more smoke)
+  ctx.globalCompositeOperation = 'source-over';
+  const puffCount = 26;
+  for (let i = 0; i < puffCount; i++){
+    const seed = i * 19.73;
+    const baseA = hash01(seed + 1.2) * TAU;
+    const speed = 0.08 + 0.08 * hash01(seed + 2.4);
+    const phase = fract(t * speed + hash01(seed + 3.9));
+
+    // Puff starts near the body and expands as it rises.
+    const startR = vr * (0.55 + 0.25 * hash01(seed + 5.1));
+    const endR = vr * (1.35 + 0.65 * hash01(seed + 6.2));
+    const rr = lerp(startR, endR, phase);
+
+    const swirl = Math.sin(t * (0.7 + 0.25 * hash01(seed + 7.7)) + seed) * (0.22 + 0.12 * hash01(seed + 8.3));
+    const a = baseA + swirl;
+
+    const rise = -vr * (0.35 + 0.55 * phase);
+    const cx = Math.cos(a) * rr * (0.62 + 0.18 * Math.sin(t * 0.9 + seed));
+    const cy = Math.sin(a) * rr * (0.48 + 0.15 * Math.cos(t * 1.0 + seed)) + rise;
+
+    const grow = 0.55 + 0.75 * phase;
+    const rx = vr * (0.55 + 0.35 * hash01(seed + 9.1)) * grow;
+    const ry = vr * (0.45 + 0.30 * hash01(seed + 10.2)) * grow;
+
+    // Alpha fades as puff rises; a little denser at the bottom.
+    const alpha = (0.32 + 0.26 * (1 - phase)) * (0.85 + 0.15 * Math.sin(seed));
+
+    const offX = cx - rx * (0.15 + 0.10 * hash01(seed + 11.1));
+    const offY = cy - ry * (0.22 + 0.10 * hash01(seed + 12.7));
+    const pg = ctx.createRadialGradient(offX, offY, 0, cx, cy, Math.max(rx, ry) * 1.25);
+    pg.addColorStop(0, `rgba(14,14,18,${alpha})`);
+    pg.addColorStop(0.55, `rgba(62,62,70,${alpha * 0.78})`);
+    pg.addColorStop(0.82, `rgba(125,125,132,${alpha * 0.34})`);
+    pg.addColorStop(1, 'rgba(140,140,148,0)');
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, a * 0.35, 0, TAU);
+    ctx.fill();
+  }
+
+  // Reset filter for anything else after.
+  ctx.filter = 'none';
+
+  ctx.restore();
+}
+
+function drawBrideRageFrontFx(b, vr){
+  // Smoke front layer: rising wisps and puffs above head.
+  const t = world.t || 0;
+  const TAU = Math.PI * 2;
+
+  ctx.save();
+  ctx.translate(b.x, b.y);
+
+  function fract(x){ return x - Math.floor(x); }
+  function hash01(x){ return fract(Math.sin(x) * 43758.5453123); }
+
+  // Front wisps: slightly sharper than back, but still soft.
+  const wispBlur = Math.max(0.75, vr * 0.045);
+  ctx.filter = `blur(${wispBlur.toFixed(2)}px)`;
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Many small rising wisps (more smoke)
+  const wispCount = 24;
+  for (let i = 0; i < wispCount; i++){
+    const seed = i * 41.17;
+    const speed = 0.22 + 0.20 * hash01(seed + 2.0);
+    const phase = fract(t * speed + hash01(seed + 5.0));
+
+    const lane = (hash01(seed + 7.0) * 2 - 1);
+    const x = lane * vr * (0.95 + 0.20 * Math.sin(t * 0.8 + seed)) + Math.sin(t * 1.2 + seed) * vr * 0.10;
+    const y = -vr * (0.35 + 1.65 * phase);
+
+    const grow = 0.55 + 0.95 * phase;
+    const rx = vr * (0.18 + 0.10 * hash01(seed + 9.0)) * grow;
+    const ry = vr * (0.22 + 0.12 * hash01(seed + 10.0)) * grow;
+    const rot = (hash01(seed + 11.0) - 0.5) * 1.2 + Math.sin(t * 0.6 + seed) * 0.15;
+
+    const alpha = (0.28 + 0.34 * (1 - phase)) * (0.85 + 0.15 * Math.sin(seed));
+    const sg = ctx.createRadialGradient(x - rx * 0.18, y - ry * 0.22, 0, x, y, Math.max(rx, ry) * 1.35);
+    sg.addColorStop(0, `rgba(34,34,40,${alpha})`);
+    sg.addColorStop(0.55, `rgba(82,82,92,${alpha * 0.62})`);
+    sg.addColorStop(0.85, `rgba(150,150,158,${alpha * 0.22})`);
+    sg.addColorStop(1, 'rgba(160,160,168,0)');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, rot, 0, TAU);
+    ctx.fill();
+  }
+
+  // A couple of curled smoke strokes (reads as "real" smoke wisps)
+  ctx.filter = `blur(${Math.max(0.5, vr * 0.03).toFixed(2)}px)`;
+  ctx.strokeStyle = 'rgba(120,120,128,0.22)';
+  ctx.lineWidth = Math.max(1.2, vr * 0.05);
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++){
+    const s = i * 2.4;
+    const x0 = (hash01(10 + s) * 2 - 1) * vr * 0.55;
+    const y0 = -vr * (0.55 + 0.25 * i);
+    const x1 = x0 + Math.sin(t * 0.9 + s) * vr * 0.35;
+    const y1 = y0 - vr * 0.55;
+    const x2 = x0 - Math.cos(t * 0.8 + s) * vr * 0.35;
+    const y2 = y0 - vr * 1.05;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.bezierCurveTo(x1, y1, x2, y1, x2, y2);
+    ctx.stroke();
+  }
+
+  ctx.filter = 'none';
 
   ctx.restore();
 }

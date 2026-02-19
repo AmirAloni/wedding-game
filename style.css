@@ -184,7 +184,7 @@ canvas#game{
 /* Joystick when inside the panel: at bottom of panel */
 .startUI-demoPanel .joystick{
   position: absolute;
-  bottom: 18px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -497,7 +497,7 @@ canvas#game{
   position:absolute;
   z-index: 3; /* above canvas, below overlays */
   left: 50%;
-  bottom: calc(48px + env(safe-area-inset-bottom));
+  bottom: calc(24px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: 140px;
   height: 140px;
