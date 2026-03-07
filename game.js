@@ -78,6 +78,12 @@ rightSpeakerImg.decoding = 'async';
 rightSpeakerImg.loading = 'eager';
 rightSpeakerImg.src = 'assets/right-speaker.webp';
 
+const levelTwoBgImg = new Image();
+levelTwoBgImg.decoding = 'async';
+levelTwoBgImg.loading = 'eager';
+levelTwoBgImg.src = 'assets/level-two-backgroung.jpg';
+levelTwoBgImg.addEventListener('load', () => { bgCache = null; }, { once: true });
+
 // Stage 3 (chuppah) props
 const levelThreeBgImg = new Image();
 levelThreeBgImg.decoding = 'async';
@@ -130,6 +136,8 @@ const DEFAULT_GAME_DURATION = 30; // seconds (fallback)
 // - Change CHAOS_WEIGHTS to bias which events happen more.
 const DEFAULT_CHAOS_EVENT_MIN_MS = 4000;
 const DEFAULT_CHAOS_EVENT_MAX_MS = 4000;
+/** Seconds of calm between the end of one chaos and the start of the next. */
+const CHAOS_BREAK_SEC = 3;
 
 // How to adjust difficulty:
 // - Increase PLAYER_SPEED to make catching easier.
@@ -231,7 +239,7 @@ const STAGES = [
     chaosEventMaxMs: 3600,
     chaosWeights: null, // filled after ChaosEvent declared
     mushuBoostRange: [1.35, 1.75],
-    shakeIntensity: 0.65,
+    shakeIntensity: 0.45,
     brideRageEnabled: false,
     brideRageDurFactor: 0,
     talRage: {
@@ -255,7 +263,7 @@ const STAGES = [
     chaosEventMaxMs: 4200,
     chaosWeights: null,
     mushuBoostRange: [1.55, 2.05],
-    shakeIntensity: 1.0,
+    shakeIntensity: 0.7,
     brideRageEnabled: true,
     brideRageDurFactor: 1.5,
     talRage: {
@@ -280,7 +288,7 @@ const STAGES = [
     chaosEventMaxMs: 4800,
     chaosWeights: null,
     mushuBoostRange: [2.8, 3.6],
-    shakeIntensity: 0.85,
+    shakeIntensity: 0.6,
     brideRageEnabled: true,
     brideRageDurFactor: 1.05,
     talRage: {
@@ -445,6 +453,7 @@ function applyStageParams(cfg){
     chaosEventMinMs: cfg.chaosEventMinMs ?? DEFAULT_CHAOS_EVENT_MIN_MS,
     chaosEventMaxMs: cfg.chaosEventMaxMs ?? DEFAULT_CHAOS_EVENT_MAX_MS,
     chaosWeights: cfg.chaosWeights,
+    chaosSequence: cfg.chaosSequence,
     mushuBoostRange: cfg.mushuBoostRange ?? [1.6, 2.3],
     shakeIntensity: cfg.shakeIntensity ?? 1.0,
     brideRageEnabled: !!cfg.brideRageEnabled,
@@ -552,21 +561,23 @@ function buildBackgroundCache(){
   }
 
   if (stage === 1){
-    // Indoor hall: keep the TOP clean, put the dance floor up top near the bar.
-    const wall = g.createLinearGradient(0, 0, 0, h);
-    wall.addColorStop(0, '#2b2a2f');
-    wall.addColorStop(0.32, '#34333c');
-    wall.addColorStop(0.62, '#1e1e24');
-    wall.addColorStop(1, '#121216');
-    g.fillStyle = wall;
-    g.fillRect(0, 0, w, h);
+    // Indoor hall: use provided background image, fallback to gradient + dance floor if not loaded yet.
+    const drew = drawImageCover(levelTwoBgImg);
+    if (!drew){
+      const wall = g.createLinearGradient(0, 0, 0, h);
+      wall.addColorStop(0, '#2b2a2f');
+      wall.addColorStop(0.32, '#34333c');
+      wall.addColorStop(0.62, '#1e1e24');
+      wall.addColorStop(1, '#121216');
+      g.fillStyle = wall;
+      g.fillRect(0, 0, w, h);
 
-    // Soft vignette for depth (clean, no extra decorations up top).
-    const vig = g.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.10, w * 0.5, h * 0.45, Math.max(w, h) * 0.95);
-    vig.addColorStop(0, 'rgba(255,255,255,0)');
-    vig.addColorStop(1, 'rgba(0,0,0,0.42)');
-    g.fillStyle = vig;
-    g.fillRect(0, 0, w, h);
+      const vig = g.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.10, w * 0.5, h * 0.45, Math.max(w, h) * 0.95);
+      vig.addColorStop(0, 'rgba(255,255,255,0)');
+      vig.addColorStop(1, 'rgba(0,0,0,0.42)');
+      g.fillStyle = vig;
+      g.fillRect(0, 0, w, h);
+    }
 
     // Dance floor (checkered) near the top area.
     const dfX = clamp(w * 0.18, 20, w - 20);
@@ -847,7 +858,7 @@ let demoCaught = false;
 let demoResetAt = 0;
 let demoTimerStarted = false;
 let demoTimeLeft = 0;
-const DEMO_CATCH_SHOW_SEC = 1.2; /* celebration then auto-start with 3-2-1 countdown */
+const DEMO_CATCH_SHOW_SEC = 1.2; /* celebration then go straight to stage 1 (no countdown) */
 
 function initDemoPositions(){
   const w = canvas.width || 400;
@@ -885,7 +896,8 @@ function startGameFromDemoCatch(){
   state = GameState.PLAYING;
   setHidden(startUI, true);
   hasShownStage1HowTo = true;
-  scheduleStageStart(StageId.STAGE_1, { showHowTo: false });
+  if (devBackToStartBtn) setHidden(devBackToStartBtn, false);
+  startStageImmediately(StageId.STAGE_1);
   startLoopIfNeeded();
 }
 
@@ -1135,6 +1147,7 @@ const world = {
   chaosActive: false,
   chaosName: 'רגוע(בערך)',
   chaosUntil: 0,
+  chaosSequenceIndex: 0,
   instructionsUntil: 0,
   shakeUntil: 0,
 
@@ -1380,8 +1393,8 @@ function buildObstacles(){
     addBush(0.18, 0.44, 0.036);
     addBush(0.82, 0.42, 0.036);
   } else if (stage === 1){
-    // Hall: clean top area; bar raised high (smaller bar), speakers + dance floor below.
-    addBar(0.50, 0.008, 0.68, 0.14);
+    // Hall: clean top area; bar raised high, speakers + dance floor below.
+    addBar(0.50, 0.008, 0.78, 0.19);
     addSpeaker(0.10, 0.30, 0.20, 0.26);
     addSpeaker(0.90, 0.30, 0.20, 0.26);
 
@@ -1400,7 +1413,7 @@ function buildObstacles(){
     // Stage 3 (chuppah): hupa lowered, carpet raised. Chuppah drawn smaller (0.85x).
     const S3 = 0.81; // global 19% scale for ALL stage-3 props (not characters)
     const HUPA_SCALE = 0.85; // shrink chuppah in stage 3
-    const hupaDraw = addRect('hupa', 0.50, 0.30, 0.54 * S3 * HUPA_SCALE, 0.28 * S3 * HUPA_SCALE);
+    const hupaDraw = addRect('hupa', 0.50, 0.25, 0.54 * S3 * HUPA_SCALE, 0.28 * S3 * HUPA_SCALE);
     // Shrink collision a bit so it "feels" like the legs/area, not the whole transparent PNG.
     const ho = obstacles[obstacles.length - 1];
     ho.drawX = hupaDraw.x;
@@ -1423,21 +1436,23 @@ function buildObstacles(){
       if (yShiftFrac) o.y += o.r * yShiftFrac;
     }
 
-    // Place fountains flanking the hupa.
-    addImgCircle('fountain', 0.50 - 0.30, 0.25, 0.055 * S3);
+    // Place fountains flanking the hupa (slightly smaller in stage 3).
+    addImgCircle('fountain', 0.12, 0.25, 0.048 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.90, yShiftFrac: 0 });
-    addImgCircle('fountain', 0.50 + 0.30, 0.25, 0.055 * S3);
+    addImgCircle('fountain', 0.88, 0.25, 0.048 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.90, yShiftFrac: 0 });
 
-    // Carpet: from below chuppah down to bottom of screen (PASSABLE).
-    const carpetTop = clamp(h * 0.18, top, bottom - 220);
+    // No white path/carpet in stage 3; keep virtual strip for bush positioning (raised to match chuppah).
+    const carpetTop = clamp(h * 0.12, top, bottom - 220);
     const carpetHeightFrac = Math.max(0.65, (bottom - carpetTop) / h);
-    const carpet = addCarpet(0.50, carpetTop, 0.22 * S3, carpetHeightFrac);
+    const cw = clamp(w * (0.22 * S3), 110, 200);
+    const ch = clamp(h * carpetHeightFrac, 220, h);
+    const carpet = { x: clamp(w * 0.50 - cw / 2, left, right - cw), y: clamp(carpetTop, top, bottom - ch), w: cw, h: ch };
 
-    // Big blockers on the sides to frame the carpet.
-    addImgCircle('palmTree', 0.20, 0.14, 0.095 * S3);
+    // Big blockers on the sides to frame the aisle (slightly smaller in stage 3).
+    addImgCircle('palmTree', 0.12, 0.14, 0.082 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
-    addImgCircle('palmTree', 0.80, 0.14, 0.095 * S3);
+    addImgCircle('palmTree', 0.88, 0.14, 0.082 * S3);
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
 
     // Pink trees: two rows – upper pair then lower pair; draw slightly OUTSIDE screen edges (visual), collision inside bounds.
@@ -1454,23 +1469,24 @@ function buildObstacles(){
     tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
     obstacles[obstacles.length - 1].drawX = w * 1.01;
 
-    // Symmetric bushes along the carpet: two columns, white–pink–white.
-    const colGap = clamp(Math.min(w, h) * 0.085, 34, 64);
+    // Symmetric white bushes along the carpet: two columns close to each other, 4 per side.
+    const colGap = clamp(Math.min(w, h) * 0.048, 20, 38);
     const colPad = 22;
     const leftColX = clamp(carpet.x - colGap, left + colPad, right - colPad);
     const rightColX = clamp(carpet.x + carpet.w + colGap, left + colPad, right - colPad);
-    // Keep them closer together along the carpet.
-    const y0 = carpet.y + carpet.h * 0.34;
-    const y1 = carpet.y + carpet.h * 0.50;
-    const y2 = carpet.y + carpet.h * 0.66;
-    const rWhite = clamp(Math.min(w, h) * 0.050, 18, 40) * S3;
-    const rPink = clamp(Math.min(w, h) * 0.055, 18, 42) * S3;
+    const rWhite = clamp(Math.min(w, h) * 0.042, 15, 34) * S3;
+    const y0 = carpet.y + carpet.h * 0.32;
+    const y1 = carpet.y + carpet.h * 0.44;
+    const y2 = carpet.y + carpet.h * 0.56;
+    const y3 = carpet.y + carpet.h * 0.68;
     for (const x of [leftColX, rightColX]){
       obstacles.push({ kind: 'circle', type: 'whiteFlowers', x, y: y0, r: rWhite });
       tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.25, yShiftFrac: 0.00 });
-      obstacles.push({ kind: 'circle', type: 'bush', x, y: y1, r: rPink });
-      tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.30, yShiftFrac: 0.00 });
+      obstacles.push({ kind: 'circle', type: 'whiteFlowers', x, y: y1, r: rWhite });
+      tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.25, yShiftFrac: 0.00 });
       obstacles.push({ kind: 'circle', type: 'whiteFlowers', x, y: y2, r: rWhite });
+      tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.25, yShiftFrac: 0.00 });
+      obstacles.push({ kind: 'circle', type: 'whiteFlowers', x, y: y3, r: rWhite });
       tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.25, yShiftFrac: 0.00 });
     }
 
@@ -1664,6 +1680,7 @@ function resetGameToPlaying(stageIndex){
   world.chaosActive = false;
   world.chaosName = 'רגוע(בערך)';
   world.chaosUntil = 0;
+  world.chaosSequenceIndex = 0;
   world.instructionsUntil = world.t + (world.stageIndex === 0 ? 6 : 4);
   world.shakeUntil = 0;
   world.mushuBoost = 1;
@@ -1812,14 +1829,18 @@ const DEFAULT_CHAOS_WEIGHTS = [
 // Fill stage weights now that ChaosEvent exists.
 // Stage 1 (yard): no chaos at all.
 STAGES[0].chaosWeights = [];
+// Stage 2: fixed order – טל כועסת → רעידת באס → חוזר חלילה
 STAGES[1].chaosWeights = [
   [ChaosEvent.SCREEN_SHAKE, 1.0],
   [ChaosEvent.BRIDE_RAGE, 1.05],
 ];
+STAGES[1].chaosSequence = [ChaosEvent.BRIDE_RAGE, ChaosEvent.SCREEN_SHAKE];
+// Stage 3: fixed order – מושו טורבו → טל כועסת → חוזר חלילה
 STAGES[2].chaosWeights = [
   [ChaosEvent.MUSHU_BOOST, 1.35],
   [ChaosEvent.BRIDE_RAGE, 1.25],
 ];
+STAGES[2].chaosSequence = [ChaosEvent.MUSHU_BOOST, ChaosEvent.BRIDE_RAGE];
 
 function pickWeighted(weights){
   let total = 0;
@@ -1854,6 +1875,8 @@ function startChaosEvent(name){
   world.chaosActive = true;
   world.chaosName = name;
   world.chaosUntil = t + dur;
+  // Next chaos starts (dur + CHAOS_BREAK_SEC) from now = chaos duration + 3s break.
+  world.chaosCountdown = dur + CHAOS_BREAK_SEC;
 
   switch (name){
     case ChaosEvent.MUSHU_BOOST:
@@ -1896,10 +1919,16 @@ function updateChaos(dt){
   if (world.chaosCountdown <= 0){
     const p = world.params || {};
     world.chaosCountdown = p.chaosIntervalSec ?? 5;
-    const weights = p.chaosWeights || DEFAULT_CHAOS_WEIGHTS;
-    if (weights.length === 0) return; // Stage 1: no chaos
-    const ev = pickWeighted(weights);
-    startChaosEvent(ev);
+    const seq = p.chaosSequence;
+    if (seq && seq.length > 0){
+      const idx = world.chaosSequenceIndex % seq.length;
+      world.chaosSequenceIndex += 1;
+      startChaosEvent(seq[idx]);
+    } else {
+      const weights = p.chaosWeights || DEFAULT_CHAOS_WEIGHTS;
+      if (weights.length === 0) return; // Stage 1: no chaos
+      startChaosEvent(pickWeighted(weights));
+    }
   }
 }
 
@@ -2198,6 +2227,14 @@ function update(dt){
 
   // Drag + bounce
   applyDrag(ofer, dt, 0.92);
+  // When Ofer is in contact with Mushu, apply extra resistance so he "gets stuck" in Mushu
+  const rr = ofer.r + mushu.r;
+  const distOferMushu = Math.hypot(ofer.x - mushu.x, ofer.y - mushu.y) || 0.0001;
+  if (distOferMushu < rr * 1.35) {
+    const stickFactor = 1 - (1 - distOferMushu / (rr * 1.35)) * 0.85;
+    ofer.vx *= stickFactor;
+    ofer.vy *= stickFactor;
+  }
   const isMushuTurbo = world.chaosActive && world.chaosName === ChaosEvent.MUSHU_BOOST;
   // Less drag so Mushu keeps speed and moves more continuously.
   applyDrag(mushu, dt, isMushuTurbo ? 0.978 : 0.972);
@@ -2237,7 +2274,6 @@ function update(dt){
   resolveMushuVsOfer();
 
   // Catch check
-  const rr = ofer.r + mushu.r;
   if (dist2(ofer.x, ofer.y, mushu.x, mushu.y) <= rr * rr){
     world.caught = true;
     mushu.hasRings = false;
@@ -2307,11 +2343,14 @@ function render(){
   const w = canvas.width, h = canvas.height;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // Screen shake chaos
+  // Screen shake chaos (speakers drawn without shake below)
+  let shakeDx = 0, shakeDy = 0;
   if (world.shakeUntil > world.t){
     const intensity = (world.params?.shakeIntensity ?? 1.0);
     const s = rand(0.8, 1.6) * intensity * (window.devicePixelRatio || 1);
-    ctx.translate(rand(-1, 1) * s * 6, rand(-1, 1) * s * 6);
+    shakeDx = rand(-1, 1) * s * 4;
+    shakeDy = rand(-1, 1) * s * 4;
+    ctx.translate(shakeDx, shakeDy);
   }
 
   // Background (changes per stage: yard / hall / chuppah).
@@ -2368,27 +2407,25 @@ function render(){
       } else if (o.type === 'bar'){
         const cx = o.x + o.w / 2;
         const cy = o.y + o.h / 2;
-        if (drawImgContain(ctx, barImg, cx, cy, o.w * 3.3, o.h * 3.3, 'center')) continue;
+        if (drawImgContain(ctx, barImg, cx, cy, o.w * 3.85, o.h * 3.85, 'center')) continue;
       } else if (o.type === 'speaker'){
         const isLeft = o.x < w / 2;
         const img = isLeft ? leftSpeakerImg : rightSpeakerImg;
         const cx = o.x + o.w / 2;
         const cy = o.y + o.h / 2;
-        if (drawImgContain(ctx, img, cx, cy, o.w * 1.5, o.h * 1.5, 'center')) continue;
+        const speakerScale = (world.shakeUntil > world.t) ? 1.28 : 1.0;
+        ctx.save();
+        ctx.translate(-shakeDx, -shakeDy);
+        if (drawImgContain(ctx, img, cx, cy, o.w * 1.5 * speakerScale, o.h * 1.5 * speakerScale, 'center')){ ctx.restore(); continue; }
+        ctx.restore();
+        continue;
       }
     }
 
-    // Stage 3 (chuppah): render prop images. (Only the carpet is passable; everything else is solid.)
+    // Stage 3 (chuppah): render prop images. (No white path/carpet; everything else is solid.)
     if (stageIndex === 2){
       if (o.type === 'carpet'){
-        // Draw as a tall strip, centered in its rect.
-        const cx = o.x + o.w / 2;
-        const cy = o.y + o.h / 2;
-        ctx.save();
-        ctx.globalAlpha = 0.92;
-        // Draw exactly to the rect to keep it flush to the chuppah.
-        if (drawImgContain(ctx, whiteCarpetImg, cx, cy, o.w, o.h, 'center')){ ctx.restore(); continue; }
-        ctx.restore();
+        continue; // Carpet not used in stage 3 (no white path).
       } else if (o.type === 'hupa'){
         const dx = (o.drawX ?? o.x);
         const dy = (o.drawY ?? o.y);
@@ -2569,7 +2606,12 @@ function render(){
       ctx.fillStyle = 'rgba(255,250,243,.72)';
       ctx.fillText('בר', o.x + o.w * 0.5, o.y + o.h * 0.28);
     } else if (o.type === 'speaker'){
-      // Speaker (solid obstacle)
+      // Speaker (solid obstacle) – drawn without screen shake; larger during bass shake
+      const spCx = o.x + o.w / 2, spCy = o.y + o.h / 2;
+      const speakerScale = (world.shakeUntil > world.t) ? 1.28 : 1.0;
+      ctx.save();
+      ctx.translate(-shakeDx, -shakeDy);
+      if (speakerScale !== 1.0){ ctx.translate(spCx, spCy); ctx.scale(speakerScale, speakerScale); ctx.translate(-spCx, -spCy); }
       drawRoundedRect(ctx, o.x, o.y, o.w, o.h, o.r, 'rgba(18,18,22,.90)', 'rgba(255,255,255,.10)');
       ctx.fillStyle = 'rgba(255,250,243,.06)';
       ctx.fillRect(o.x + 8, o.y + 8, o.w - 16, 8);
@@ -2586,6 +2628,7 @@ function render(){
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(cx, topCy, r1, 0, Math.PI * 2); ctx.stroke();
       ctx.beginPath(); ctx.arc(cx, botCy, r1, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
     } else if (o.type === 'chuppah'){
       // Canopy + poles
       const pad = 10;

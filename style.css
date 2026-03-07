@@ -1,13 +1,16 @@
 :root{
-  /* Garden-wedding palette (inspired by reference image). */
-  --lawn0:#b9e56f;
-  --lawn1:#6fd07f;
-  --lawn2:#2f8d52;
-  --blush0:#ffd2e7;
-  --blush1:#ff7bb8;
+  /* Garden-wedding palette with a softer solarpunk start screen. */
+  --lawn0:#cceaa0;
+  --lawn1:#7fd18f;
+  --lawn2:#347c56;
+  --blush0:#ffe1d0;
+  --blush1:#f39a6b;
   --ivory:#fffaf3;
   --stone:#e9eef1;
-  --water:#67c7ff;
+  --water:#7fd8d5;
+  --sun:#f5d978;
+  --leafGlow:#dff5c6;
+  --canopy:#1f5b3d;
 
   --ink:#12311c;
   --muted: rgba(18,49,28,.72);
@@ -87,13 +90,19 @@ canvas#game{
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: calc(12px + env(safe-area-inset-top)) 14px 14px 14px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom)) 14px;
+  overflow-y: auto;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
   background:
+    radial-gradient(120% 85% at 50% -10%, rgba(245,217,120,.55) 0%, rgba(245,217,120,0) 46%),
+    radial-gradient(95% 70% at 16% 22%, rgba(223,245,198,.52) 0%, rgba(223,245,198,0) 58%),
+    radial-gradient(85% 65% at 86% 18%, rgba(127,216,213,.32) 0%, rgba(127,216,213,0) 58%),
     linear-gradient(180deg,
-      rgba(18,49,28,.22) 0%,
-      rgba(18,49,28,.12) 28%,
-      transparent 42%,
-      transparent 100%);
+      rgba(31,91,61,.20) 0%,
+      rgba(31,91,61,.10) 30%,
+      rgba(255,250,243,.04) 48%,
+      rgba(18,49,28,.12) 100%);
   pointer-events: none;
 }
 
@@ -107,24 +116,34 @@ canvas#game{
 .startUI-background{
   width: min(520px, 92vw);
   text-align: center;
-  padding: 0 4px;
+  padding: 14px 14px 8px;
   margin-bottom: 12px;
   position: relative;
   z-index: 1;
+  border: 1px solid rgba(255,250,243,.44);
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 120% at 50% 0%, rgba(245,217,120,.18) 0%, rgba(245,217,120,0) 48%),
+    linear-gradient(180deg, rgba(255,250,243,.72), rgba(244,251,239,.42));
+  box-shadow:
+    0 18px 45px rgba(31,91,61,.16),
+    0 0 0 1px rgba(255,255,255,.18) inset;
+  backdrop-filter: blur(12px);
 }
 
 .startUI-background .title{
   margin-bottom: 8px;
   color: var(--ink);
   text-shadow:
-    0 0 20px rgba(255,250,243,.9),
-    0 2px 4px rgba(18,49,28,.25),
-    0 1px 0 rgba(255,255,255,.6);
-  filter: drop-shadow(0 2px 6px rgba(18,49,28,.2));
+    0 0 24px rgba(245,217,120,.42),
+    0 2px 10px rgba(31,91,61,.18),
+    0 1px 0 rgba(255,255,255,.8);
+  filter: drop-shadow(0 3px 10px rgba(31,91,61,.16));
 }
 
 .startUI-background .subtitle{
   margin-bottom: 12px;
+  color: rgba(18,49,28,.78);
 }
 
 .startUI-background .howto{
@@ -135,26 +154,26 @@ canvas#game{
 .startUI-footer{
   width: min(520px, 92vw);
   text-align: center;
-  padding: 12px 4px calc(12px + env(safe-area-inset-bottom)) 4px;
+  padding: 12px 4px calc(24px + env(safe-area-inset-bottom)) 4px;
   flex-shrink: 0;
 }
 
 .startUI-footer .bigBtn{
   margin: 0;
   background:
-    radial-gradient(100% 120% at 30% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.2) 55%),
-    linear-gradient(135deg, rgba(255,210,231,.98), rgba(255,123,184,.95));
+    radial-gradient(100% 120% at 25% 18%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.16) 52%),
+    linear-gradient(135deg, rgba(223,245,198,.96), rgba(127,209,143,.94) 52%, rgba(57,150,104,.96));
   box-shadow:
-    0 0 0 1px rgba(255,255,255,.5) inset,
-    0 12px 32px rgba(255,123,184,.35),
-    0 4px 12px rgba(18,49,28,.18);
+    0 0 0 1px rgba(255,255,255,.42) inset,
+    0 14px 34px rgba(52,124,86,.28),
+    0 4px 12px rgba(18,49,28,.16);
   position: relative;
   z-index: 2;
 }
 .startUI-footer .bigBtn:active{
   box-shadow:
     0 0 0 1px rgba(255,255,255,.4) inset,
-    0 6px 20px rgba(255,123,184,.3),
+    0 6px 20px rgba(52,124,86,.24),
     0 2px 8px rgba(18,49,28,.15);
 }
 
@@ -162,11 +181,12 @@ canvas#game{
   margin-top: 10px;
 }
 
-/* Dev-only nav (start screen → stages) */
+/* Dev-only nav (start screen → stages) – above start button so never cut off */
 .devNav{
-  margin-top: 14px;
+  margin-top: 0;
+  margin-bottom: 14px;
   padding: 10px 0;
-  border-top: 1px dashed rgba(18,49,28,.25);
+  border-bottom: 1px dashed rgba(52,124,86,.28);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -185,14 +205,14 @@ canvas#game{
   font-size: 13px;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(18,49,28,.2);
-  background: rgba(255,250,243,.7);
+  border: 1px solid rgba(52,124,86,.22);
+  background: rgba(244,251,239,.82);
   color: rgba(18,49,28,.8);
   font-weight: 800;
   cursor: pointer;
 }
 .devNav button:active{
-  background: rgba(255,210,231,.6);
+  background: rgba(223,245,198,.78);
 }
 
 /* Dev-only: back to start (during play) */
@@ -224,12 +244,14 @@ canvas#game{
   min-height: 0;
   width: min(100%, 420px);
   max-width: 92vw;
-  border: 2px solid var(--stroke);
-  border-radius: 20px;
-  background: transparent;
+  border: 1px solid rgba(255,250,243,.34);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255,250,243,.14), rgba(255,250,243,.04));
   box-shadow:
-    0 0 0 1px rgba(255,255,255,.2) inset,
-    0 0 0 9999px rgba(18,49,28,.52);
+    0 0 0 1px rgba(255,255,255,.16) inset,
+    0 0 0 9999px rgba(24,70,46,.36),
+    0 24px 60px rgba(18,49,28,.14);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -259,8 +281,10 @@ canvas#game{
   right: 12px;
   bottom: calc(140px + 22px);
   overflow: hidden;
-  border-radius: 14px;
-  background: linear-gradient(180deg, var(--lawn0) 0%, var(--lawn1) 55%, var(--lawn2) 100%);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(245,217,120,.22) 0%, rgba(245,217,120,0) 44%),
+    linear-gradient(180deg, #d8efb3 0%, #92d7a0 55%, #347c56 100%);
 }
 
 .startUI-demoViewport #game{
@@ -317,8 +341,8 @@ canvas#game{
 .demoHint--inside{
   font-size: 12px;
   font-weight: 800;
-  color: rgba(18,49,28,.75);
-  text-shadow: 0 1px 2px rgba(255,250,243,.6);
+  color: rgba(18,49,28,.8);
+  text-shadow: 0 1px 3px rgba(255,250,243,.72);
 }
 
 .overlay--center .panel,
@@ -368,18 +392,18 @@ canvas#game{
   font-size: 18px;
   padding: 14px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(18,49,28,.18);
+  border: 1px solid rgba(52,124,86,.22);
   background:
-    radial-gradient(100% 120% at 30% 20%, rgba(255,255,255,.65) 0%, rgba(255,255,255,0) 55%),
-    linear-gradient(135deg, rgba(255,210,231,.95), rgba(255,123,184,.90));
+    radial-gradient(100% 120% at 28% 18%, rgba(255,255,255,.72) 0%, rgba(255,255,255,0) 52%),
+    linear-gradient(135deg, rgba(245,217,120,.92), rgba(243,154,107,.9));
   color: rgba(18,49,28,.92);
   font-weight: 900;
   letter-spacing: .04em;
-  box-shadow: 0 10px 28px rgba(255,123,184,.22);
+  box-shadow: 0 12px 30px rgba(243,154,107,.26);
 }
 
 .bigBtn:focus-visible{
-  outline: 3px solid rgba(255,123,184,.35);
+  outline: 3px solid rgba(127,209,143,.4);
   outline-offset: 3px;
 }
 
@@ -397,11 +421,14 @@ canvas#game{
 
 .howto{
   margin: 12px 0 14px 0;
-  border: 1px solid rgba(18,49,28,.12);
-  background: rgba(255,250,243,.55);
-  border-radius: 14px;
+  border: 1px solid rgba(52,124,86,.14);
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(127,216,213,.16) 0%, rgba(127,216,213,0) 42%),
+    rgba(255,250,243,.7);
+  border-radius: 16px;
   padding: 10px 10px;
   text-align: center;
+  box-shadow: 0 10px 24px rgba(31,91,61,.08);
 }
 
 .howtoTitle{
