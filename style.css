@@ -115,6 +115,12 @@ canvas#game{
 
 .startUI-background .title{
   margin-bottom: 8px;
+  color: var(--ink);
+  text-shadow:
+    0 0 20px rgba(255,250,243,.9),
+    0 2px 4px rgba(18,49,28,.25),
+    0 1px 0 rgba(255,255,255,.6);
+  filter: drop-shadow(0 2px 6px rgba(18,49,28,.2));
 }
 
 .startUI-background .subtitle{
@@ -135,10 +141,81 @@ canvas#game{
 
 .startUI-footer .bigBtn{
   margin: 0;
+  background:
+    radial-gradient(100% 120% at 30% 20%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.2) 55%),
+    linear-gradient(135deg, rgba(255,210,231,.98), rgba(255,123,184,.95));
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.5) inset,
+    0 12px 32px rgba(255,123,184,.35),
+    0 4px 12px rgba(18,49,28,.18);
+  position: relative;
+  z-index: 2;
+}
+.startUI-footer .bigBtn:active{
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.4) inset,
+    0 6px 20px rgba(255,123,184,.3),
+    0 2px 8px rgba(18,49,28,.15);
 }
 
 .startUI-footer .tiny{
   margin-top: 10px;
+}
+
+/* Dev-only nav (start screen → stages) */
+.devNav{
+  margin-top: 14px;
+  padding: 10px 0;
+  border-top: 1px dashed rgba(18,49,28,.25);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.devNav-label{
+  font-size: 11px;
+  color: rgba(18,49,28,.55);
+  font-weight: 700;
+  width: 100%;
+  text-align: center;
+  margin-bottom: 4px;
+}
+.devNav button{
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(18,49,28,.2);
+  background: rgba(255,250,243,.7);
+  color: rgba(18,49,28,.8);
+  font-weight: 800;
+  cursor: pointer;
+}
+.devNav button:active{
+  background: rgba(255,210,231,.6);
+}
+
+/* Dev-only: back to start (during play) */
+.devBackBtn{
+  position: absolute;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  left: 10px;
+  z-index: 5;
+  pointer-events: auto;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(18,49,28,.25);
+  background: rgba(255,250,243,.85);
+  color: rgba(18,49,28,.75);
+  font-weight: 800;
+  cursor: pointer;
+}
+.devBackBtn:active{
+  background: rgba(255,210,231,.7);
+}
+.devBackBtn.isHidden{
+  display: none;
 }
 
 /* Demo panel: only this area shows the canvas; rest of screen is covered by panel shadow */
@@ -163,6 +240,17 @@ canvas#game{
   min-height: 200px;
 }
 
+/* Timer on start screen: top-right of demo panel with spacing */
+.startUI-timerWrap{
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  left: auto;
+  transform: none;
+  z-index: 2;
+  pointer-events: none;
+}
+
 /* Viewport: clips canvas so Ofer/Mushu stay inside panel */
 .startUI-demoViewport{
   position: absolute;
@@ -184,7 +272,7 @@ canvas#game{
 /* Joystick when inside the panel: at bottom of panel */
 .startUI-demoPanel .joystick{
   position: absolute;
-  bottom: 8px;
+  bottom: 4px;
   left: 50%;
   transform: translateX(-50%);
 }
@@ -197,6 +285,33 @@ canvas#game{
   justify-content: center;
   padding-top: 14px;
   pointer-events: none;
+}
+
+/* Finger hint next to joystick on start screen (centered above joystick, on top) */
+.startUI-finger{
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 32px;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 10;
+  animation: startUI-fingerBounce 1.2s ease-in-out infinite;
+}
+@keyframes startUI-fingerBounce{
+  0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+  50%      { transform: translateX(-50%) translateY(-8px); opacity: .9; }
+}
+@media (max-width: 380px){
+  .startUI-finger{ font-size: 28px; }
+  @keyframes startUI-fingerBounce{
+    0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+    50%      { transform: translateX(-50%) translateY(-6px); opacity: .9; }
+  }
+}
+@media (prefers-reduced-motion: reduce){
+  .startUI-finger{ animation: none; }
 }
 
 .demoHint--inside{
@@ -497,7 +612,7 @@ canvas#game{
   position:absolute;
   z-index: 3; /* above canvas, below overlays */
   left: 50%;
-  bottom: calc(24px + env(safe-area-inset-bottom));
+  bottom: calc(8px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: 140px;
   height: 140px;

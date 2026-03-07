@@ -138,6 +138,9 @@ const DEFAULT_CHAOS_EVENT_MAX_MS = 4000;
 const DEFAULT_MUSHU_BASE_SPEED = 330;
 const ARENA_MARGIN = 18;
 
+// Celebration after full clear: dance screen duration (stage 2 look, Ofer+Tal only).
+const CELEBRATION_DURATION = 10;
+
 // How to change text:
 // - Edit OUTCOMES at the bottom for different absurd endings.
 
@@ -153,12 +156,19 @@ let bgCache = null;
 const startUI = document.getElementById('startUI');
 const startUIDemoPanel = document.getElementById('startUI-demoPanel');
 const startUIDemoViewport = document.getElementById('startUI-demoViewport');
+const startUITimerWrap = document.getElementById('startUI-timerWrap');
+const hudRow = document.getElementById('hudRow');
 const endUI = document.getElementById('endUI');
 const rotateUI = document.getElementById('rotateUI');
 const stageUI = document.getElementById('stageUI');
 
 const startBtn = document.getElementById('startBtn');
 const restartBtn = document.getElementById('restartBtn');
+const devStage1Btn = document.getElementById('devStage1');
+const devStage2Btn = document.getElementById('devStage2');
+const devStage3Btn = document.getElementById('devStage3');
+const devCelebrationBtn = document.getElementById('devCelebration');
+const devBackToStartBtn = document.getElementById('devBackToStart');
 
 const timerEl = document.getElementById('timer');
 const chaosEl = document.getElementById('chaos');
@@ -311,7 +321,7 @@ function awardCatchScore(stageIndex){
   const cfg = getStageCfg(stageIndex);
   const dur = (cfg?.durationSec ?? world.params?.durationSec ?? DEFAULT_GAME_DURATION);
   const remaining = clamp(world.timeLeft ?? 0, 0, dur);
-  const points = Math.max(0, Math.round((remaining / dur) * 1000));
+  const points = Math.max(0, Math.round((remaining / dur) * 100));
   const timeSpentSec = clamp(dur - remaining, 0, dur);
   runScore.stages[stageIndex].points = points;
   runScore.stages[stageIndex].timeSpentSec = timeSpentSec;
@@ -325,7 +335,7 @@ function renderEndScore(){
   const lines = runScore.stages.map((s, i) => {
     const label = `שלב ${i + 1}`;
     if (s.points == null) return `${label}: —`;
-    return `${label}: ${s.points} נק׳ • ${s.timeSpentSec.toFixed(1)}ש׳`;
+    return `${label}: ${s.points} נק׳ • ${s.timeSpentSec.toFixed(1)}`;
   });
   lines.push(`סה״כ: ${runScore.totalPoints} נק׳`);
   endScoreEl.textContent = lines.join('\n');
@@ -835,6 +845,8 @@ const demoOfer = { x: 0, y: 0, vx: 0, vy: 0, r: 22 };
 const demoMushu = { x: 0, y: 0, vx: 0, vy: 0, r: 18 };
 let demoCaught = false;
 let demoResetAt = 0;
+let demoTimerStarted = false;
+let demoTimeLeft = 0;
 const DEMO_CATCH_SHOW_SEC = 1.2; /* celebration then auto-start with 3-2-1 countdown */
 
 function initDemoPositions(){
@@ -851,6 +863,7 @@ function initDemoPositions(){
   demoMushu.vy = 30;
   demoCaught = false;
   demoResetAt = 0;
+  demoTimerStarted = false;
 }
 
 function startGameFromDemoCatch(){
@@ -866,6 +879,7 @@ function startGameFromDemoCatch(){
     appEl.insertBefore(canvas, appEl.firstChild);
   }
   if (joystickEl && appEl) appEl.appendChild(joystickEl);
+  if (timerEl && hudRow) hudRow.appendChild(timerEl);
   setJoystickHidden(false);
 
   state = GameState.PLAYING;
@@ -881,6 +895,15 @@ function updateDemo(dt){
       startGameFromDemoCatch();
     }
     return;
+  }
+
+  // Start demo timer on first joystick touch
+  if (joystick.active && !demoTimerStarted) {
+    demoTimerStarted = true;
+  }
+  if (demoTimerStarted) {
+    demoTimeLeft = clamp(demoTimeLeft - dt, 0, 999);
+    if (timerEl) timerEl.textContent = demoTimeLeft.toFixed(1);
   }
 
   // Steer demo Ofer from joystick (same logic as steerOfer)
@@ -905,7 +928,19 @@ function updateDemo(dt){
   demoOfer.x += demoOfer.vx * dt;
   demoOfer.y += demoOfer.vy * dt;
 
-  // Mushu wanders slowly
+  // Mushu wanders slowly; repel from Ofer when close so he doesn't get stuck
+  const dx = demoMushu.x - demoOfer.x;
+  const dy = demoMushu.y - demoOfer.y;
+  const d2 = dist2(demoOfer.x, demoOfer.y, demoMushu.x, demoMushu.y);
+  const repelRadius = 38;
+  if (d2 > 0 && d2 < repelRadius * repelRadius) {
+    const d = Math.sqrt(d2);
+    const nx = dx / d;
+    const ny = dy / d;
+    const strength = (1 - d / repelRadius) * 45;
+    demoMushu.vx += nx * strength;
+    demoMushu.vy += ny * strength;
+  }
   demoMushu.x += demoMushu.vx * dt;
   demoMushu.y += demoMushu.vy * dt;
   const w = canvas.width || 400;
@@ -1109,6 +1144,9 @@ const world = {
 
   caught: false,
   endReason: '',
+
+  celebrationMode: false,
+  celebrationUntil: 0,
 };
 
 const ofer = {
@@ -1235,9 +1273,9 @@ function buildObstacles(){
   }
 
   function addBar(nx, ny, nW, nH){
-    // Wider/taller collision (hall bar is prominent).
-    const bw = clamp(w * nW, 260, 720);
-    const bh = clamp(h * nH, 90, 260);
+    // Bar size (smaller in stage 2 per request).
+    const bw = clamp(w * nW, 180, 520);
+    const bh = clamp(h * nH, 60, 180);
     const x = clamp(w * nx - bw / 2, left, right - bw);
     const y = clamp(h * ny, top, bottom - bh);
     obstacles.push({ kind: 'rect', type: 'bar', x, y, w: bw, h: bh, r: 18 });
@@ -1342,8 +1380,8 @@ function buildObstacles(){
     addBush(0.18, 0.44, 0.036);
     addBush(0.82, 0.42, 0.036);
   } else if (stage === 1){
-    // Hall: clean top area; bar raised high, speakers + dance floor below.
-    addBar(0.50, 0.008, 0.96, 0.22);
+    // Hall: clean top area; bar raised high (smaller bar), speakers + dance floor below.
+    addBar(0.50, 0.008, 0.68, 0.14);
     addSpeaker(0.10, 0.30, 0.20, 0.26);
     addSpeaker(0.90, 0.30, 0.20, 0.26);
 
@@ -1540,6 +1578,29 @@ function resolveBodyVsObstacles(body){
   return hit;
 }
 
+// Mushu must not overlap Ofer: when his movement would hit Ofer, only Mushu is pushed out and his velocity is reflected (he changes direction; Ofer stays put).
+function resolveMushuVsOfer(){
+  const rr = mushu.r + ofer.r;
+  const d2 = dist2(mushu.x, mushu.y, ofer.x, ofer.y);
+  if (d2 >= rr * rr) return false;
+
+  const d = Math.sqrt(d2) || 0.0001;
+  const nx = (mushu.x - ofer.x) / d;
+  const ny = (mushu.y - ofer.y) / d;
+  const overlap = rr - d;
+
+  mushu.x += nx * overlap;
+  mushu.y += ny * overlap;
+
+  const vn = mushu.vx * nx + mushu.vy * ny;
+  if (vn < 0) {
+    const restitution = 0.4;
+    mushu.vx -= (1 + restitution) * vn * nx;
+    mushu.vy -= (1 + restitution) * vn * ny;
+  }
+  return true;
+}
+
 function nudgeBodiesOutOfObstacles(){
   // A few iterations to prevent spawning inside props on resize.
   for (let i = 0; i < 6; i++){
@@ -1666,15 +1727,57 @@ function resetGameToPlaying(stageIndex){
   setJoystickHidden(false);
 }
 
+// Celebration: stage 2 (hall) look, Ofer and Tal dance only. No Mushu, no chaos, no joystick.
+// Uses same stageIndex=1 so edits to "screen 2" apply here too.
+function enterCelebration(){
+  world.celebrationMode = true;
+  world.celebrationUntil = world.t + CELEBRATION_DURATION;
+  world.stageIndex = StageId.STAGE_2; // 1 = hall / הרחבת ריקודים
+  world.chaosActive = false;
+  world.brideRage = false;
+  bgCache = null;
+  obstacles.length = 0;
+  syncWorldToCanvasSize();
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  // Dance floor center (same as buildBackgroundCache stage 1)
+  const cx = w * 0.5;
+  const cy = h * 0.39;
+  ofer.x = cx - 42;
+  ofer.y = cy;
+  ofer.vx = 0;
+  ofer.vy = 0;
+  tal.visible = true;
+  tal.x = cx + 42;
+  tal.y = cy;
+  tal.vx = 0;
+  tal.vy = 0;
+  setJoystickHidden(true);
+  resetJoystickVisual();
+  setHidden(hudRow, true);
+  setHidden(chaosEl, true);
+  // Big confetti burst at start – random positions across the screen
+  particles.length = 0;
+  const pad = Math.min(w, h) * 0.08;
+  for (let i = 0; i < 5; i++){
+    const rx = pad + rand(0, w - 2 * pad);
+    const ry = pad + rand(0, h - 2 * pad);
+    spawnConfetti(55, rx, ry, 520);
+  }
+  world.celebrationLastConfettiAt = world.t;
+}
+
 function enterEnd(reason){
   state = GameState.END;
   world.playEnabled = false;
   world.endReason = reason;
+  world.celebrationMode = false;
   setHidden(endUI, false);
   setHidden(startUI, true);
   setHidden(stageUI, true);
   setJoystickHidden(true);
   resetJoystickVisual();
+  setHidden(hudRow, false);
   if (instructionsEl) instructionsEl.style.opacity = '0';
   // Keep the last frame behind the overlay (no more simulation needed).
   // We still render one more time for "freeze-frame drama".
@@ -1898,6 +2001,16 @@ function updateMushuAI(dt){
     vy -= towardOferY * 1.9;
   }
 
+  // Repel from Ofer when very close so Mushu doesn't get stuck (weak so catching is still possible)
+  const repelRadius = 38;
+  if (distToOfer > 0 && distToOfer < repelRadius) {
+    const nx = -towardOferX;
+    const ny = -towardOferY;
+    const strength = (1 - distToOfer / repelRadius) * 45;
+    mushu.vx += nx * strength;
+    mushu.vy += ny * strength;
+  }
+
   // Normalize
   const m2 = Math.hypot(vx, vy) || 1;
   vx /= m2; vy /= m2;
@@ -2022,7 +2135,41 @@ function updateParticles(dt){
   }
 }
 
+// Dance animation: Ofer and Tal orbit on the dance floor (celebration only).
+function updateCelebration(dt){
+  if (world.t >= world.celebrationUntil){
+    enterEnd('ALL_CLEAR');
+    return;
+  }
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const cx = w * 0.5;
+  const cy = h * 0.39;
+  const radius = 48;
+  const speed = 0.75;
+  const t = world.t;
+  ofer.x = cx + Math.cos(t * speed) * radius;
+  ofer.y = cy + Math.sin(t * speed * 0.85) * (radius * 0.5);
+  tal.x = cx + Math.cos(t * speed + Math.PI) * radius;
+  tal.y = cy + Math.sin(t * speed * 0.85 + Math.PI) * (radius * 0.5);
+  // Ongoing fireworks every ~0.7s at random positions on screen
+  if (world.t - (world.celebrationLastConfettiAt ?? 0) >= 0.7){
+    world.celebrationLastConfettiAt = world.t;
+    const pad = Math.min(w, h) * 0.1;
+    for (let i = 0; i < 3; i++){
+      const rx = pad + rand(0, w - 2 * pad);
+      const ry = pad + rand(0, h - 2 * pad);
+      spawnConfetti(40, rx, ry, 420);
+    }
+  }
+  updateParticles(dt);
+}
+
 function update(dt){
+  if (world.celebrationMode){
+    updateCelebration(dt);
+    return;
+  }
   // Update timer
   world.timeLeft -= dt;
   if (world.timeLeft <= 0){
@@ -2086,6 +2233,9 @@ function update(dt){
   resolveBodyVsObstacles(mushu);
   if (tal.visible) resolveBodyVsObstacles(tal);
 
+  // Mushu must not enter Ofer: if his movement would overlap Ofer, push Mushu out and reflect his velocity (he changes direction; Ofer is not moved).
+  resolveMushuVsOfer();
+
   // Catch check
   const rr = ofer.r + mushu.r;
   if (dist2(ofer.x, ofer.y, mushu.x, mushu.y) <= rr * rr){
@@ -2109,7 +2259,7 @@ function update(dt){
       hideStageOverlay();
       setQuip(`תפיסה הירואית (+${pts} נק׳). מושו: \"זה היה חימום\".`, 1900);
     } else {
-      enterEnd('ALL_CLEAR');
+      enterCelebration();
     }
     return;
   }
@@ -2461,8 +2611,8 @@ function render(){
     }
   }
 
-  // Ring aura around Mushu if he has rings
-  if (mushu.hasRings){
+  // Ring aura around Mushu if he has rings (not in celebration)
+  if (!world.celebrationMode && mushu.hasRings){
     const mushuVr = mushu.r * (mushu.renderScale ?? 1);
     const pulse = 0.5 + 0.5 * Math.sin(world.t * 9);
     ctx.strokeStyle = `rgba(255,215,140,${0.18 + 0.18 * pulse})`;
@@ -2478,9 +2628,9 @@ function render(){
     ctx.fillText('💍💍', mushu.x, mushu.y - mushuVr - 16);
   }
 
-  // Characters
+  // Characters (celebration: only Ofer and Tal dancing)
   drawBody(ofer);
-  drawBody(mushu);
+  if (!world.celebrationMode) drawBody(mushu);
   if (tal.visible) drawBody(tal);
 
   // Particles on top
@@ -2513,9 +2663,9 @@ function render(){
     }
   }
 
-  // HUD text updates (DOM overlay)
-  timerEl.textContent = `${world.timeLeft.toFixed(1)}ש׳`;
-  if (world.chaosActive){
+  // HUD text updates (DOM overlay; hidden during celebration)
+  if (!world.celebrationMode) timerEl.textContent = world.timeLeft.toFixed(1);
+  if (!world.celebrationMode && world.chaosActive){
     chaosEl.textContent = chaosBannerText(world.chaosName);
     setHidden(chaosEl, false);
   } else {
@@ -2543,10 +2693,167 @@ function render(){
   }
 }
 
+function getCelebrationDancePose(b, vr){
+  if (!world?.celebrationMode) return null;
+  if (b !== ofer && b !== tal) return null;
+  const phase = (b === tal) ? Math.PI : 0;
+  const groove = (world.t || 0) * 6.1 + phase;
+  return {
+    swayX: Math.sin(groove * 0.72) * vr * 0.22,
+    bobY: Math.sin(groove * 1.65) * vr * 0.18,
+    torsoLean: Math.sin(groove * 0.72) * 0.3,
+    headTilt: Math.sin(groove * 1.3) * 0.2,
+    armSwing: Math.sin(groove * 2.2) * 0.75,
+    forearmSwing: Math.cos(groove * 2.1 + 0.45) * 0.55,
+    legSwing: Math.sin(groove * 1.7 + 0.3) * 0.58,
+    kneeSwing: Math.cos(groove * 1.7 + 0.2) * 0.36,
+    clapOpen: (Math.sin(groove * 2.6) * 0.5 + 0.5),
+    wristFlick: Math.sin(groove * 3.4) * vr * 0.12,
+    shoulderLift: Math.sin(groove * 3.1) * vr * 0.08,
+  };
+}
+
+function drawStickPath(points){
+  if (!points || points.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++){
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.stroke();
+}
+
+function drawStickLimb(x, y, upperLen, upperAngle, lowerLen, lowerAngle){
+  const elbowX = x + Math.cos(upperAngle) * upperLen;
+  const elbowY = y + Math.sin(upperAngle) * upperLen;
+  const handX = elbowX + Math.cos(upperAngle + lowerAngle) * lowerLen;
+  const handY = elbowY + Math.sin(upperAngle + lowerAngle) * lowerLen;
+
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(elbowX, elbowY);
+  ctx.lineTo(handX, handY);
+  ctx.stroke();
+
+  return { elbowX, elbowY, handX, handY };
+}
+
+function drawCelebrationStickBody(b, vr, pose){
+  if (!pose) return;
+
+  const bodyColor = (b === tal) ? 'rgba(255,244,250,.98)' : 'rgba(241,255,248,.98)';
+  const accentColor = (b === tal) ? 'rgba(255,182,216,.8)' : 'rgba(86,255,193,.75)';
+  const bodyDrop = vr * 0.72;
+  const centerX = b.x + pose.swayX * 0.35;
+  const neckY = b.y + vr * 0.52 + bodyDrop + pose.bobY * 0.12;
+  const shoulderY = b.y + vr * 0.84 + bodyDrop + pose.bobY * 0.2;
+  const hipY = b.y + vr * 1.72 + bodyDrop + pose.bobY * 0.45;
+  const shoulderSpread = vr * 0.42;
+  const hipSpread = vr * 0.26;
+  const torsoShift = pose.torsoLean * vr * 0.46;
+
+  const leftShoulder = { x: centerX - shoulderSpread + torsoShift, y: shoulderY - pose.shoulderLift * 0.4 };
+  const rightShoulder = { x: centerX + shoulderSpread + torsoShift, y: shoulderY + pose.shoulderLift * 0.4 };
+  const leftHip = { x: centerX - hipSpread - torsoShift * 0.2, y: hipY };
+  const rightHip = { x: centerX + hipSpread - torsoShift * 0.2, y: hipY };
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = bodyColor;
+  ctx.lineWidth = Math.max(3, vr * 0.12);
+  ctx.shadowColor = 'rgba(18,49,28,.18)';
+  ctx.shadowBlur = 8;
+
+  ctx.beginPath();
+  ctx.moveTo(centerX + torsoShift * 0.1, neckY);
+  ctx.lineTo(leftShoulder.x, leftShoulder.y);
+  ctx.lineTo(leftHip.x, leftHip.y);
+  ctx.moveTo(rightShoulder.x, rightShoulder.y);
+  ctx.lineTo(centerX + torsoShift * 0.1, neckY);
+  ctx.lineTo(rightHip.x, rightHip.y);
+  ctx.moveTo(leftShoulder.x, leftShoulder.y);
+  ctx.lineTo(rightShoulder.x, rightShoulder.y);
+  ctx.moveTo(leftHip.x, leftHip.y);
+  ctx.lineTo(rightHip.x, rightHip.y);
+  ctx.stroke();
+
+  if (b === tal){
+    const armOut = vr * 0.58;
+    const handOut = vr * 0.92;
+    const armWave = pose.wristFlick * 0.8;
+    drawStickPath([
+      leftShoulder,
+      { x: leftShoulder.x - armOut, y: leftShoulder.y + pose.shoulderLift * 0.3 },
+      { x: leftShoulder.x - handOut, y: leftShoulder.y + armWave }
+    ]);
+    drawStickPath([
+      rightShoulder,
+      { x: rightShoulder.x + armOut, y: rightShoulder.y - pose.shoulderLift * 0.3 },
+      { x: rightShoulder.x + handOut, y: rightShoulder.y - armWave }
+    ]);
+  } else {
+    const clapGap = vr * (0.12 + pose.clapOpen * 0.34);
+    const clapY = shoulderY + vr * 0.32 + pose.bobY * 0.18;
+    const leftPalm = { x: centerX - clapGap, y: clapY };
+    const rightPalm = { x: centerX + clapGap, y: clapY };
+    drawStickPath([
+      leftShoulder,
+      {
+        x: centerX - vr * 0.48,
+        y: shoulderY + vr * 0.06 - pose.shoulderLift * 0.2,
+      },
+      leftPalm
+    ]);
+    drawStickPath([
+      rightShoulder,
+      {
+        x: centerX + vr * 0.48,
+        y: shoulderY + vr * 0.06 + pose.shoulderLift * 0.2,
+      },
+      rightPalm
+    ]);
+
+    if (clapGap <= vr * 0.18){
+      ctx.beginPath();
+      ctx.moveTo(centerX - vr * 0.08, clapY - vr * 0.08);
+      ctx.lineTo(centerX + vr * 0.08, clapY + vr * 0.08);
+      ctx.moveTo(centerX - vr * 0.08, clapY + vr * 0.08);
+      ctx.lineTo(centerX + vr * 0.08, clapY - vr * 0.08);
+      ctx.stroke();
+    }
+  }
+
+  drawStickLimb(
+    leftHip.x,
+    leftHip.y,
+    vr * 0.64,
+    1.98 + pose.legSwing * 0.28,
+    vr * 0.5,
+    -0.36 + pose.kneeSwing * 0.2
+  );
+  drawStickLimb(
+    rightHip.x,
+    rightHip.y,
+    vr * 0.64,
+    1.16 - pose.legSwing * 0.28,
+    vr * 0.5,
+    0.36 - pose.kneeSwing * 0.2
+  );
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = accentColor;
+  ctx.beginPath();
+  ctx.arc(centerX + torsoShift * 0.14, shoulderY + (hipY - shoulderY) * 0.42, Math.max(3, vr * 0.12), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawBody(b){
   const vr = b.r * (b.renderScale ?? 1);
   const stageIndex = (world?.stageIndex ?? 0);
   const talRageFx = (b === tal) && !!world?.brideRage && stageIndex === 2;
+  const celebrationPose = getCelebrationDancePose(b, vr);
   // Shadow
   ctx.fillStyle = 'rgba(0,0,0,.28)';
   ctx.beginPath();
@@ -2557,6 +2864,8 @@ function drawBody(b){
   if (talRageFx){
     drawBrideRageBackFx(b, vr);
   }
+
+  drawCelebrationStickBody(b, vr, celebrationPose);
 
   // Body (special case: characters use local sticker images for display only)
   const imgReady = (img) => !!img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
@@ -2580,7 +2889,13 @@ function drawBody(b){
     const dw = stickerImg.naturalWidth * scale;
     const dh = stickerImg.naturalHeight * scale;
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(stickerImg, b.x - dw / 2, b.y - dh / 2, dw, dh);
+    if (celebrationPose){
+      ctx.translate(b.x, b.y + celebrationPose.bobY * 0.35);
+      ctx.rotate(celebrationPose.headTilt);
+      ctx.drawImage(stickerImg, -dw / 2, -dh / 2 - vr * 0.08, dw, dh);
+    } else {
+      ctx.drawImage(stickerImg, b.x - dw / 2, b.y - dh / 2, dw, dh);
+    }
     ctx.restore();
   } else {
     const g = ctx.createRadialGradient(b.x - vr * 0.35, b.y - vr * 0.35, 2, b.x, b.y, vr * 1.2);
@@ -2942,9 +3257,11 @@ function enterIdle(){
   setHidden(endUI, true);
   setHidden(rotateUI, true);
   setHidden(stageUI, true);
+  if (devBackToStartBtn) setHidden(devBackToStartBtn, true);
   setJoystickHidden(false);
   if (canvas && startUIDemoViewport) startUIDemoViewport.appendChild(canvas);
   if (joystickEl && startUIDemoPanel) startUIDemoPanel.appendChild(joystickEl);
+  if (timerEl && startUITimerWrap) startUITimerWrap.appendChild(timerEl);
   if (joystickEl) joystickEl.classList.add('joystick--onStart');
   resetJoystickVisual();
   setQuip('');
@@ -2952,7 +3269,9 @@ function enterIdle(){
   chaosEl.textContent = '';
   setHidden(chaosEl, true);
   const idleDur = (getStageCfg(StageId.STAGE_1)?.durationSec ?? DEFAULT_GAME_DURATION);
-  timerEl.textContent = `${idleDur.toFixed(1)}ש׳`;
+  demoTimeLeft = idleDur;
+  demoTimerStarted = false;
+  if (timerEl) timerEl.textContent = idleDur.toFixed(1);
   world.playEnabled = false;
   world.stageIndex = StageId.STAGE_1;
   applyStageParams(getStageCfg(StageId.STAGE_1));
@@ -2963,11 +3282,7 @@ function enterIdle(){
   demoRafId = requestAnimationFrame(demoLoop);
 }
 
-startBtn.addEventListener('click', async () => {
-  // Unlock audio ONLY after user interaction (MANDATORY).
-  await ensureAudioUnlocked();
-  audio.sfx.start();
-
+function goToPlayingAndStartStage(stageIndex) {
   if (demoRafId) {
     cancelAnimationFrame(demoRafId);
     demoRafId = 0;
@@ -2978,15 +3293,70 @@ startBtn.addEventListener('click', async () => {
     appEl.insertBefore(canvas, appEl.firstChild);
   }
   if (joystickEl && appEl) appEl.appendChild(joystickEl);
+  if (timerEl && hudRow) hudRow.appendChild(timerEl);
   setJoystickHidden(false);
-
-  // Start immediately (no how-to overlay, no countdown).
   state = GameState.PLAYING;
   setHidden(startUI, true);
-  hasShownStage1HowTo = true;
-  startStageImmediately(StageId.STAGE_1);
+  if (stageIndex === 0) hasShownStage1HowTo = true;
+  if (devBackToStartBtn) setHidden(devBackToStartBtn, false);
+  startStageImmediately(stageIndex);
   startLoopIfNeeded();
+}
+
+function goToCelebration() {
+  if (demoRafId) {
+    cancelAnimationFrame(demoRafId);
+    demoRafId = 0;
+  }
+  if (joystickEl) joystickEl.classList.remove('joystick--onStart');
+  const appEl = document.getElementById('app');
+  if (canvas && startUIDemoViewport && canvas.parentNode === startUIDemoViewport && appEl) {
+    appEl.insertBefore(canvas, appEl.firstChild);
+  }
+  if (joystickEl && appEl) appEl.appendChild(joystickEl);
+  if (timerEl && hudRow) hudRow.appendChild(timerEl);
+  state = GameState.PLAYING;
+  setHidden(startUI, true);
+  if (devBackToStartBtn) setHidden(devBackToStartBtn, false);
+  resizeCanvas();
+  syncWorldToCanvasSize();
+  world.t = nowSec();
+  world.playEnabled = true;
+  enterCelebration();
+  startLoopIfNeeded();
+}
+
+startBtn.addEventListener('click', async () => {
+  await ensureAudioUnlocked();
+  audio.sfx.start();
+  goToPlayingAndStartStage(StageId.STAGE_1);
 }, { passive: true });
+
+function setupDevStageButton(btn, stageIndex) {
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    await ensureAudioUnlocked();
+    audio.sfx.start();
+    goToPlayingAndStartStage(stageIndex);
+  }, { passive: true });
+}
+setupDevStageButton(devStage1Btn, StageId.STAGE_1);
+setupDevStageButton(devStage2Btn, StageId.STAGE_2);
+setupDevStageButton(devStage3Btn, StageId.STAGE_3);
+
+if (devCelebrationBtn) {
+  devCelebrationBtn.addEventListener('click', async () => {
+    await ensureAudioUnlocked();
+    audio.sfx.start();
+    goToCelebration();
+  }, { passive: true });
+}
+
+if (devBackToStartBtn) {
+  devBackToStartBtn.addEventListener('click', () => {
+    enterIdle();
+  }, { passive: true });
+}
 
 restartBtn.addEventListener('click', async () => {
   await ensureAudioUnlocked();
