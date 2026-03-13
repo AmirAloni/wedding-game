@@ -1428,12 +1428,17 @@ function buildObstacles(){
     ho.solid = false;
 
     function tuneStage3CircleCollision(o, { mul, yShiftFrac }){
-      // Keep drawing anchored to original position/size, but collision uses adjusted circle.
+      // Keep drawing anchored to original position/size; collision circle can be shrunk and centered on visual.
       o.drawX = o.x;
       o.drawY = o.y;
       o.drawR = o.r;
       o.r *= (mul ?? 1);
       if (yShiftFrac) o.y += o.r * yShiftFrac;
+    }
+    function centerStage3TreeCollision(o){
+      // After drawX/drawY may be overridden: put collision center at visual center.
+      o.x = o.drawX ?? o.x;
+      o.y = o.drawY ?? o.y;
     }
 
     // Place fountains flanking the hupa (slightly smaller in stage 3).
@@ -1449,25 +1454,31 @@ function buildObstacles(){
     const ch = clamp(h * carpetHeightFrac, 220, h);
     const carpet = { x: clamp(w * 0.50 - cw / 2, left, right - cw), y: clamp(carpetTop, top, bottom - ch), w: cw, h: ch };
 
-    // Big blockers on the sides to frame the aisle (slightly smaller in stage 3).
-    addImgCircle('palmTree', 0.12, 0.14, 0.082 * S3);
-    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
-    addImgCircle('palmTree', 0.88, 0.14, 0.082 * S3);
-    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.85, yShiftFrac: 0.00 });
+    // Big blockers on the sides to frame the aisle (same visual size as stage-1 trees); collision smaller and centered on tree.
+    const palmTreeNr = 0.0754;
+    addImgCircle('palmTree', 0.12, 0.14, palmTreeNr);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 0.5, yShiftFrac: 0 });
+    addImgCircle('palmTree', 0.88, 0.14, palmTreeNr);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 0.5, yShiftFrac: 0 });
 
-    // Pink trees: two rows – upper pair then lower pair; draw slightly OUTSIDE screen edges (visual), collision inside bounds.
-    addImgCircle('pinkTree', 0.08, 0.42, 0.072 * S3);
-    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    // Pink trees: same visual size as stage-1 trees; collision smaller and centered on tree (drawX shifted to edges).
+    const pinkTreeNr = 0.0754;
+    addImgCircle('pinkTree', 0.08, 0.42, pinkTreeNr);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 0.5, yShiftFrac: 0 });
     obstacles[obstacles.length - 1].drawX = w * -0.01;
-    addImgCircle('pinkTree', 0.92, 0.40, 0.072 * S3);
-    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    centerStage3TreeCollision(obstacles[obstacles.length - 1]);
+    addImgCircle('pinkTree', 0.92, 0.40, pinkTreeNr);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 0.5, yShiftFrac: 0 });
     obstacles[obstacles.length - 1].drawX = w * 1.01;
-    addImgCircle('pinkTree', 0.08, 0.66, 0.072 * S3);
-    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    centerStage3TreeCollision(obstacles[obstacles.length - 1]);
+    addImgCircle('pinkTree', 0.08, 0.66, pinkTreeNr);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 0.5, yShiftFrac: 0 });
     obstacles[obstacles.length - 1].drawX = w * -0.01;
-    addImgCircle('pinkTree', 0.92, 0.64, 0.072 * S3);
-    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 1.75, yShiftFrac: 0.00 });
+    centerStage3TreeCollision(obstacles[obstacles.length - 1]);
+    addImgCircle('pinkTree', 0.92, 0.64, pinkTreeNr);
+    tuneStage3CircleCollision(obstacles[obstacles.length - 1], { mul: 0.5, yShiftFrac: 0 });
     obstacles[obstacles.length - 1].drawX = w * 1.01;
+    centerStage3TreeCollision(obstacles[obstacles.length - 1]);
 
     // Symmetric white bushes along the carpet: two columns close to each other, 4 per side.
     const colGap = clamp(Math.min(w, h) * 0.048, 20, 38);
@@ -1619,10 +1630,10 @@ function resolveMushuVsOfer(){
 
 function nudgeBodiesOutOfObstacles(){
   // A few iterations to prevent spawning inside props on resize.
+  // Mushu passes through obstacles in all stages; only Ofer and Tal are nudged out.
   for (let i = 0; i < 6; i++){
     let any = false;
     any = resolveBodyVsObstacles(ofer) || any;
-    any = resolveBodyVsObstacles(mushu) || any;
     any = (tal.visible && resolveBodyVsObstacles(tal)) || any;
     if (!any) break;
   }
@@ -2265,9 +2276,8 @@ function update(dt){
     if ((bonked1 || bonked2) && audio) audio.sfx.bonk();
   }
 
-  // Wedding props collisions (tables/chairs/chuppah): nobody passes through.
+  // Wedding props collisions: Ofer and Tal hit obstacles; Mushu passes through (no collision).
   resolveBodyVsObstacles(ofer);
-  resolveBodyVsObstacles(mushu);
   if (tal.visible) resolveBodyVsObstacles(tal);
 
   // Mushu must not enter Ofer: if his movement would overlap Ofer, push Mushu out and reflect his velocity (he changes direction; Ofer is not moved).
@@ -2361,11 +2371,12 @@ function render(){
     ctx.fillRect(0, 0, w, h);
   }
 
-  // Wedding props (obstacles)
+  // Wedding props (obstacles) – trees drawn after characters so they appear in front
   if (!obstacles.length) buildObstacles();
   const stageIndex = (world.stageIndex ?? 0);
   for (let i = 0; i < obstacles.length; i++){
     const o = obstacles[i];
+    if (o.type === 'tree' || o.type === 'whiteTree' || o.type === 'palmTree' || o.type === 'pinkTree') continue;
     // Stage 1 (yard): swap props to provided webp assets.
     if (stageIndex === 0){
       if (o.type === 'table'){
@@ -2374,28 +2385,6 @@ function render(){
       } else if (o.type === 'bush'){
         // Slightly bottom-anchored so it "sits" on the lawn.
         if (drawImgContain(ctx, pinkBushImg, o.x, o.y + o.r * 1.05, o.r * 2.65, o.r * 2.35, 'bottom')) continue;
-      } else if (o.type === 'tree'){
-        const img = (o.variant === 'palm') ? palmTreeImg : treeImg;
-        const cx = o.drawCx ?? o.cx ?? (o.x + o.w / 2);
-        const by = o.drawBy ?? o.by ?? (o.y + o.h);
-        const maxW = o.drawMaxW ?? o.maxW ?? (o.w || 0);
-        const maxH = o.drawMaxH ?? o.maxH ?? (o.h || 0);
-        if (isImgReady(img)){
-          const d = imgContainDims(img, cx, by, maxW, maxH, 'bottom');
-          ctx.drawImage(img, d.x, d.y, d.w, d.h);
-          // Sync collision circle to the (tunable) center of the drawn image.
-          const xOff = (o.variant === 'palm') ? STAGE1_TREE_HITBOX.palmX : STAGE1_TREE_HITBOX.treeX;
-          const colCx = (d.x + d.w * 0.5) + d.w * xOff;
-          const colCy = d.y + d.h * STAGE1_TREE_HITBOX.cy;
-          const colR = Math.min(d.w, d.h) * STAGE1_TREE_HITBOX.r;
-          o.kind = 'circle';
-          o.x = colCx;
-          o.y = colCy;
-          o.r = colR;
-          continue;
-        }
-        // Fallback: draw with the approximate max rect.
-        if (drawImgContain(ctx, img, cx, by, maxW, maxH, 'bottom')) continue;
       }
     }
 
@@ -2439,21 +2428,6 @@ function render(){
         const dy = (o.drawY ?? o.y);
         const dr = (o.drawR ?? o.r);
         if (drawImgContain(ctx, fountainImg, dx, dy, dr * 4.2, dr * 4.2, 'center')) continue;
-      } else if (o.type === 'whiteTree'){
-        const dx = (o.drawX ?? o.x);
-        const dy = (o.drawY ?? o.y);
-        const dr = (o.drawR ?? o.r);
-        if (drawImgContain(ctx, whiteTreeImg, dx, dy, dr * 5.0, dr * 6.3, 'center')) continue;
-      } else if (o.type === 'palmTree'){
-        const dx = (o.drawX ?? o.x);
-        const dy = (o.drawY ?? o.y);
-        const dr = (o.drawR ?? o.r);
-        if (drawImgContain(ctx, palmTreeImg, dx, dy, dr * 5.2, dr * 6.8, 'center')) continue;
-      } else if (o.type === 'pinkTree'){
-        const dx = (o.drawX ?? o.x);
-        const dy = (o.drawY ?? o.y);
-        const dr = (o.drawR ?? o.r);
-        if (drawImgContain(ctx, pinkTreeImg, dx, dy, dr * 5.2, dr * 6.6, 'center')) continue;
       } else if (o.type === 'bush'){
         const dx = (o.drawX ?? o.x);
         const dy = (o.drawY ?? o.y);
@@ -2675,6 +2649,47 @@ function render(){
   drawBody(ofer);
   if (!world.celebrationMode) drawBody(mushu);
   if (tal.visible) drawBody(tal);
+
+  // Trees drawn on top so they appear in front of characters
+  for (let i = 0; i < obstacles.length; i++){
+    const o = obstacles[i];
+    if (stageIndex === 0 && o.type === 'tree'){
+      const img = (o.variant === 'palm') ? palmTreeImg : treeImg;
+      const cx = o.drawCx ?? o.cx ?? (o.x + o.w / 2);
+      const by = o.drawBy ?? o.by ?? (o.y + o.h);
+      const maxW = o.drawMaxW ?? o.maxW ?? (o.w || 0);
+      const maxH = o.drawMaxH ?? o.maxH ?? (o.h || 0);
+      if (isImgReady(img)){
+        const d = imgContainDims(img, cx, by, maxW, maxH, 'bottom');
+        ctx.drawImage(img, d.x, d.y, d.w, d.h);
+        const xOff = (o.variant === 'palm') ? STAGE1_TREE_HITBOX.palmX : STAGE1_TREE_HITBOX.treeX;
+        const colCx = (d.x + d.w * 0.5) + d.w * xOff;
+        const colCy = d.y + d.h * STAGE1_TREE_HITBOX.cy;
+        const colR = Math.min(d.w, d.h) * STAGE1_TREE_HITBOX.r;
+        o.kind = 'circle';
+        o.x = colCx;
+        o.y = colCy;
+        o.r = colR;
+      } else {
+        drawImgContain(ctx, img, cx, by, maxW, maxH, 'bottom');
+      }
+    } else if (stageIndex === 2 && o.type === 'whiteTree'){
+      const dx = (o.drawX ?? o.x);
+      const dy = (o.drawY ?? o.y);
+      const dr = (o.drawR ?? o.r);
+      drawImgContain(ctx, whiteTreeImg, dx, dy, dr * 5.0, dr * 6.3, 'center');
+    } else if (stageIndex === 2 && o.type === 'palmTree'){
+      const dx = (o.drawX ?? o.x);
+      const dy = (o.drawY ?? o.y);
+      const dr = (o.drawR ?? o.r);
+      drawImgContain(ctx, palmTreeImg, dx, dy, dr * 5.2, dr * 6.8, 'center');
+    } else if (stageIndex === 2 && o.type === 'pinkTree'){
+      const dx = (o.drawX ?? o.x);
+      const dy = (o.drawY ?? o.y);
+      const dr = (o.drawR ?? o.r);
+      drawImgContain(ctx, pinkTreeImg, dx, dy, dr * 5.2, dr * 6.6, 'center');
+    }
+  }
 
   // Particles on top
   for (const p of particles){
