@@ -358,6 +358,34 @@ canvas#game{
   box-shadow: var(--shadow);
 }
 
+.overlay--center .panel.panel--end{
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: min(580px, calc(100% - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  max-height: calc(100% - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.overlay--center .panel.panel--end .endUIMessages{
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  padding: 4px 0 16px;
+}
+
+.overlay--center .panel.panel--end .endUIMessages .subtitle{
+  margin-bottom: 0;
+}
+
+.overlay--center .panel.panel--end .endUIFooter{
+  flex: 0 0 auto;
+}
+
 .title{
   font-weight: 900;
   letter-spacing: 0;
@@ -561,16 +589,37 @@ canvas#game{
   border-color: rgba(255,123,184,.40);
 }
 
+@keyframes chaosBannerPulse{
+  0%, 100%{ opacity: 1; }
+  50%{ opacity: 0.14; }
+}
+
 #chaos.pill--chaos{
   position:absolute;
-  top: calc(10px + env(safe-area-inset-top));
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  max-width: calc(100% - 20px);
+  transform: translate(-50%, -50%);
+  max-width: min(92vw, 22em);
   text-align:center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  z-index: 5;
+  font-size: clamp(17px, 4.8vw, 24px);
+  padding: 14px 22px;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  box-shadow: 0 14px 36px rgba(106, 28, 66, 0.18);
+}
+
+#chaos.pill--chaos.chaosBanner--pulse{
+  animation: chaosBannerPulse 1s ease-in-out 3 both;
+}
+
+@media (prefers-reduced-motion: reduce){
+  #chaos.pill--chaos.chaosBanner--pulse{
+    animation: none;
+  }
 }
 
 .instructions{
@@ -588,11 +637,13 @@ canvas#game{
   backdrop-filter: blur(8px);
 }
 
+/* Stage-complete lines: vertical center in play area; horizontal span like pre-center layout. */
 .quip{
   position:absolute;
   left: 10px;
   right: 10px;
-  top: calc(56px + 82px + env(safe-area-inset-top));
+  top: 50%;
+  box-sizing: border-box;
   border: 1px solid rgba(255,123,184,.28);
   background: rgba(255,250,243,.58);
   border-radius: 999px;
@@ -602,14 +653,15 @@ canvas#game{
   font-weight: 900;
   text-align: center;
   letter-spacing: .01em;
+  white-space: pre-line;
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(calc(-50% - 10px));
   transition: opacity .18s ease, transform .18s ease;
 }
 
 .quip.isOn{
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(-50%);
 }
 
 .stageText{

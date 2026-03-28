@@ -138,6 +138,8 @@ const DEFAULT_CHAOS_EVENT_MIN_MS = 4000;
 const DEFAULT_CHAOS_EVENT_MAX_MS = 4000;
 /** Seconds of calm between the end of one chaos and the start of the next. */
 const CHAOS_BREAK_SEC = 3;
+/** HUD chaos label: blink duration, then hide (matches CSS animation length). */
+const CHAOS_BANNER_VISIBLE_SEC = 3;
 
 // How to adjust difficulty:
 // - Increase PLAYER_SPEED to make catching easier.
@@ -180,6 +182,7 @@ const devBackToStartBtn = document.getElementById('devBackToStart');
 
 const timerEl = document.getElementById('timer');
 const chaosEl = document.getElementById('chaos');
+let hudPrevChaosActive = false;
 const instructionsEl = document.getElementById('instructions');
 const quipEl = document.getElementById('quip');
 const endTitleEl = document.getElementById('endTitle');
@@ -1147,6 +1150,7 @@ const world = {
   chaosActive: false,
   chaosName: 'רגוע(בערך)',
   chaosUntil: 0,
+  chaosBannerUntil: 0,
   chaosSequenceIndex: 0,
   instructionsUntil: 0,
   shakeUntil: 0,
@@ -1691,6 +1695,7 @@ function resetGameToPlaying(stageIndex){
   world.chaosActive = false;
   world.chaosName = 'רגוע(בערך)';
   world.chaosUntil = 0;
+  world.chaosBannerUntil = 0;
   world.chaosSequenceIndex = 0;
   world.instructionsUntil = world.t + (world.stageIndex === 0 ? 6 : 4);
   world.shakeUntil = 0;
@@ -1867,6 +1872,7 @@ function pickWeighted(weights){
 function clearChaosEffects(){
   world.chaosActive = false;
   world.chaosName = 'רגוע(בערך)';
+  world.chaosBannerUntil = 0;
   world.mushuBoost = 1;
   world.brideRage = false;
   world.shakeUntil = 0;
@@ -1914,6 +1920,8 @@ function startChaosEvent(name){
       tal.vy *= 1.1;
       break;
   }
+
+  world.chaosBannerUntil = t + CHAOS_BANNER_VISIBLE_SEC;
 
   if (audio) audio.sfx.chaos();
 
@@ -2303,8 +2311,8 @@ function update(dt){
       stageStartAt = world.t + 0.7;
       countdownFromAt = 0;
       hideStageOverlay();
-      const quipStage1 = `איזה תפיסה! (+${pts} נק׳). מושו: \"זה היה חימום\".`;
-      const quipStage2 = `תפיסה הירואית (+${pts} נק׳). מושו: \"אוקיי אוקיי, הפעם ניצחתם… עד השלב הבא.\"`;
+      const quipStage1 = `איזה תפיסה! (+${pts} נק׳).\nמושו: \"זה היה חימום\".`;
+      const quipStage2 = `תפיסה הירואית (+${pts} נק׳).\nמושו: \"אוקיי אוקיי, הפעם ניצחתם… עד השלב הבא.\"`;
       setQuip(world.stageIndex === 0 ? quipStage1 : quipStage2, 5200);
     } else {
       enterCelebration();
@@ -2725,10 +2733,22 @@ function render(){
 
   // HUD text updates (DOM overlay; hidden during celebration)
   if (!world.celebrationMode) timerEl.textContent = world.timeLeft.toFixed(1);
-  if (!world.celebrationMode && world.chaosActive){
-    chaosEl.textContent = chaosBannerText(world.chaosName);
+  const showChaosBanner = !world.celebrationMode && world.chaosActive
+    && world.t < world.chaosBannerUntil;
+  if (showChaosBanner){
+    const txt = chaosBannerText(world.chaosName);
+    const chaosJustStarted = !hudPrevChaosActive;
+    if (chaosJustStarted || chaosEl.textContent !== txt){
+      chaosEl.textContent = txt;
+      chaosEl.classList.remove('chaosBanner--pulse');
+      void chaosEl.offsetWidth;
+      chaosEl.classList.add('chaosBanner--pulse');
+    }
     setHidden(chaosEl, false);
+    hudPrevChaosActive = true;
   } else {
+    hudPrevChaosActive = false;
+    chaosEl.classList.remove('chaosBanner--pulse');
     setHidden(chaosEl, true);
   }
 
@@ -3327,6 +3347,8 @@ function enterIdle(){
   setQuip('');
   if (instructionsEl) instructionsEl.style.opacity = '0';
   chaosEl.textContent = '';
+  chaosEl.classList.remove('chaosBanner--pulse');
+  hudPrevChaosActive = false;
   setHidden(chaosEl, true);
   const idleDur = (getStageCfg(StageId.STAGE_1)?.durationSec ?? DEFAULT_GAME_DURATION);
   demoTimeLeft = idleDur;
