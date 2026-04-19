@@ -41,6 +41,8 @@
             <button type="button" id="devStage2">שלב 2</button>
             <button type="button" id="devStage3">שלב 3</button>
             <button type="button" id="devCelebration">חגיגה</button>
+            <button type="button" id="introSceneBtn">סצנה לפני שלב 1</button>
+            <button type="button" id="introScene2Btn">סצנה לפני שלב 2</button>
           </div>
           <button id="startBtn" class="bigBtn" type="button">התחל</button>
           <div class="tiny">
@@ -87,6 +89,13 @@
           <div id="stageText" class="subtitle stageText"></div>
           <div id="stageCountdown" class="countdown" aria-live="polite"></div>
           <div id="stageTiny" class="tiny"></div>
+        </div>
+      </section>
+
+      <section id="cutsceneUI" class="cutsceneUI isHidden" aria-label="סצנת מעבר" aria-live="polite">
+        <div class="cutsceneCard">
+          <div id="cutsceneKicker" class="cutsceneKicker"></div>
+          <div id="cutsceneText" class="cutsceneText"></div>
         </div>
       </section>
 

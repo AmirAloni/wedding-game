@@ -150,6 +150,8 @@ const ARENA_MARGIN = 18;
 
 // Celebration after full clear: dance screen duration (stage 2 look, Ofer+Tal only).
 const CELEBRATION_DURATION = 10;
+const STAGE1_INTRO_SCENE_DURATION = 10;
+const STAGE2_INTRO_SCENE_DURATION = 12;
 
 // How to change text:
 // - Edit OUTCOMES at the bottom for different absurd endings.
@@ -171,8 +173,13 @@ const hudRow = document.getElementById('hudRow');
 const endUI = document.getElementById('endUI');
 const rotateUI = document.getElementById('rotateUI');
 const stageUI = document.getElementById('stageUI');
+const cutsceneUI = document.getElementById('cutsceneUI');
+const cutsceneKickerEl = document.getElementById('cutsceneKicker');
+const cutsceneTextEl = document.getElementById('cutsceneText');
 
 const startBtn = document.getElementById('startBtn');
+const introSceneBtn = document.getElementById('introSceneBtn');
+const introScene2Btn = document.getElementById('introScene2Btn');
 const restartBtn = document.getElementById('restartBtn');
 const devStage1Btn = document.getElementById('devStage1');
 const devStage2Btn = document.getElementById('devStage2');
@@ -204,6 +211,7 @@ const joystickKnobEl = document.getElementById('joystickKnob');
 // =============================
 const GameState = Object.freeze({
   IDLE: 'IDLE',
+  CUTSCENE: 'CUTSCENE',
   PLAYING: 'PLAYING',
   END: 'END',
 });
@@ -411,6 +419,473 @@ function startStageImmediately(stageIndex){
   resetGameToPlaying(stageIndex);
   world.playEnabled = true;
   if (stageIndex === 0) hasShownStage1HowTo = true;
+}
+
+function hideCutsceneOverlay(){
+  if (cutsceneKickerEl) cutsceneKickerEl.textContent = '';
+  if (cutsceneTextEl) cutsceneTextEl.textContent = '';
+  if (cutsceneUI) setHidden(cutsceneUI, true);
+}
+
+function setCutsceneOverlay(kicker, text){
+  if (cutsceneKickerEl) cutsceneKickerEl.textContent = kicker || '';
+  if (cutsceneTextEl) cutsceneTextEl.textContent = text || '';
+  if (cutsceneUI) setHidden(cutsceneUI, !(kicker || text));
+}
+
+function cutsceneBeatLabel(t0, t1, headline){
+  const fmt = (t) => String(Math.max(0, t).toFixed(1)).replace('.', ',');
+  return `${fmt(t0)}–${fmt(t1)} שנ׳ · ${headline}`;
+}
+
+function mountGameIntoAppShell(){
+  const appEl = document.getElementById('app');
+  if (canvas && startUIDemoViewport && canvas.parentNode === startUIDemoViewport && appEl) {
+    appEl.insertBefore(canvas, appEl.firstChild);
+  }
+  if (joystickEl && appEl) appEl.appendChild(joystickEl);
+  if (timerEl && hudRow) hudRow.appendChild(timerEl);
+}
+
+const stageOneIntroScene = {
+  active: false,
+  startedAt: 0,
+  durationSec: STAGE1_INTRO_SCENE_DURATION,
+  ringX: 0,
+  ringY: 0,
+  ringAngle: 0,
+  ringVisible: false,
+  captionIndex: -1,
+};
+
+const stageTwoIntroScene = {
+  active: false,
+  startedAt: 0,
+  durationSec: STAGE2_INTRO_SCENE_DURATION,
+  tableTx: 0,
+  tableTy: 0,
+  tableTr: 40,
+  ringX: 0,
+  ringY: 0,
+  ringAngle: 0,
+  ringVisible: false,
+  captionIndex: -1,
+  ringStolen: false,
+  stealMushuX: null,
+  stealMushuY: null,
+};
+
+function findFirstHallTable(){
+  for (let i = 0; i < obstacles.length; i++){
+    const o = obstacles[i];
+    if (o.type === 'table') return o;
+  }
+  return null;
+}
+
+function getStageOneIntroRingAnchor(){
+  const vr = ofer.r * (ofer.renderScale ?? 1);
+  return {
+    x: ofer.x + vr * 0.52,
+    y: ofer.y - vr * 0.78,
+  };
+}
+
+function startStageOneIntroScene(){
+  stageTwoIntroScene.active = false;
+  if (demoRafId) {
+    cancelAnimationFrame(demoRafId);
+    demoRafId = 0;
+  }
+
+  if (joystickEl) joystickEl.classList.remove('joystick--onStart');
+  mountGameIntoAppShell();
+  resetJoystickVisual();
+  setJoystickHidden(true);
+  setHidden(startUI, true);
+  setHidden(endUI, true);
+  setHidden(stageUI, true);
+  setHidden(chaosEl, true);
+  setHidden(hudRow, true);
+  setQuip('');
+  if (devBackToStartBtn) setHidden(devBackToStartBtn, false);
+
+  world.celebrationMode = false;
+  world.playEnabled = false;
+  world.endReason = '';
+  world.stageIndex = StageId.STAGE_1;
+  applyStageParams(getStageCfg(StageId.STAGE_1));
+  bgCache = null;
+  obstacles.length = 0;
+  particles.length = 0;
+  resizeCanvas();
+  syncWorldToCanvasSize();
+
+  const now = nowSec();
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  world.t = now;
+  world.lastT = now;
+  world.dt = 0;
+
+  ofer.x = w * 0.14;
+  ofer.y = h * 0.77;
+  ofer.vx = 0;
+  ofer.vy = 0;
+
+  mushu.x = w * 1.08;
+  mushu.y = h * 0.86;
+  mushu.vx = 0;
+  mushu.vy = 0;
+  mushu.hasRings = false;
+  mushu.mood = 0;
+  mushu.zigUntil = 0;
+  mushu.wanderUntil = 0;
+
+  tal.visible = false;
+
+  stageOneIntroScene.active = true;
+  stageOneIntroScene.startedAt = now;
+  stageOneIntroScene.durationSec = STAGE1_INTRO_SCENE_DURATION;
+  stageOneIntroScene.captionIndex = -1;
+  stageOneIntroScene.ringVisible = true;
+  const anchor = getStageOneIntroRingAnchor();
+  stageOneIntroScene.ringX = anchor.x;
+  stageOneIntroScene.ringY = anchor.y;
+  stageOneIntroScene.ringAngle = 0.25;
+
+  state = GameState.CUTSCENE;
+  updateStageOneIntroScene();
+  startLoopIfNeeded();
+}
+
+function finishStageOneIntroScene(){
+  stageOneIntroScene.active = false;
+  stageOneIntroScene.ringVisible = false;
+  hideCutsceneOverlay();
+  setHidden(hudRow, false);
+  startStageImmediately(StageId.STAGE_1);
+}
+
+function updateStageOneIntroScene(){
+  if (!stageOneIntroScene.active) return;
+
+  const elapsed = clamp(world.t - stageOneIntroScene.startedAt, 0, stageOneIntroScene.durationSec);
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const floorX = w * 0.59;
+  const floorY = h * 0.815;
+  const walkBob = Math.sin(elapsed * 7.4) * 3.5;
+
+  if (elapsed < 3.2){
+    const k = elapsed / 3.2;
+    ofer.x = lerp(w * 0.14, w * 0.54, k);
+    ofer.y = h * 0.77 + walkBob;
+    mushu.x = w * 1.08;
+    mushu.y = h * 0.86;
+    mushu.hasRings = false;
+    const anchor = getStageOneIntroRingAnchor();
+    stageOneIntroScene.ringVisible = true;
+    stageOneIntroScene.ringX = anchor.x;
+    stageOneIntroScene.ringY = anchor.y;
+    stageOneIntroScene.ringAngle = 0.2 + Math.sin(elapsed * 4.6) * 0.12;
+  } else if (elapsed < 5.2){
+    const k = (elapsed - 3.2) / 2.0;
+    ofer.x = lerp(w * 0.54, w * 0.62, k);
+    ofer.y = h * 0.77 + walkBob * 0.8;
+    mushu.x = w * 1.08;
+    mushu.y = h * 0.86;
+    mushu.hasRings = false;
+    const anchor = getStageOneIntroRingAnchor();
+    stageOneIntroScene.ringVisible = true;
+    stageOneIntroScene.ringX = lerp(anchor.x, floorX, k);
+    stageOneIntroScene.ringY = lerp(anchor.y, floorY, k) - Math.abs(Math.sin(k * Math.PI * 2.4)) * (1 - k) * 32;
+    stageOneIntroScene.ringAngle = 0.2 + k * 3.4;
+  } else if (elapsed < 7.8){
+    const k = (elapsed - 5.2) / 2.6;
+    ofer.x = lerp(w * 0.62, w * 0.72, k);
+    ofer.y = h * 0.77 + walkBob * 0.55;
+    mushu.x = lerp(w * 1.08, floorX + 10, k);
+    mushu.y = lerp(h * 0.86, floorY + 6, k) - Math.sin(k * Math.PI) * 18;
+    mushu.hasRings = false;
+    stageOneIntroScene.ringVisible = true;
+    stageOneIntroScene.ringX = floorX;
+    stageOneIntroScene.ringY = floorY + Math.sin(elapsed * 10.5) * 1.5;
+    stageOneIntroScene.ringAngle = 3.6;
+  } else if (elapsed < 9.2){
+    const k = (elapsed - 7.8) / 1.4;
+    ofer.x = lerp(w * 0.72, w * 0.68, k);
+    ofer.y = h * 0.77 + Math.sin(elapsed * 6.5) * 1.8;
+    mushu.x = lerp(floorX + 10, w * 0.52, k);
+    mushu.y = lerp(floorY + 6, h * 0.44, k);
+    mushu.hasRings = true;
+    stageOneIntroScene.ringVisible = false;
+  } else {
+    ofer.x = w * 0.66;
+    ofer.y = h * 0.77;
+    mushu.x = w * 0.52;
+    mushu.y = h * 0.44;
+    mushu.hasRings = true;
+    stageOneIntroScene.ringVisible = false;
+  }
+
+  ofer.vx = 0;
+  ofer.vy = 0;
+  mushu.vx = 0;
+  mushu.vy = 0;
+
+  let captionIndex = 0;
+  if (elapsed >= 8.0) captionIndex = 3;
+  else if (elapsed >= 5.2) captionIndex = 2;
+  else if (elapsed >= 3.2) captionIndex = 1;
+  if (captionIndex !== stageOneIntroScene.captionIndex){
+    stageOneIntroScene.captionIndex = captionIndex;
+    if (captionIndex === 0){
+      setCutsceneOverlay('10 שניות לפני הבלאגן', 'עופר נכנס לחצר עם הטבעת, בטוח שהכל בשליטה.');
+    } else if (captionIndex === 1){
+      setCutsceneOverlay('רגע, מה זה היה?', 'הטבעת מחליקה לו לרצפה... ועופר אפילו לא שם לב.');
+    } else if (captionIndex === 2){
+      setCutsceneOverlay('מושו זיהה הזדמנות', 'מושו מגיח משום מקום ובודק אם מישהו ישים לב לשוד קטן.');
+    } else {
+      setCutsceneOverlay('וזהו, הלך הסדר', 'חטיפה! מושו ברח עם הטבעת. מכאן שלב 1 מתחיל.');
+    }
+  }
+
+  if (elapsed >= stageOneIntroScene.durationSec){
+    finishStageOneIntroScene();
+  }
+}
+
+function startStageTwoIntroScene(){
+  stageOneIntroScene.active = false;
+  if (demoRafId) {
+    cancelAnimationFrame(demoRafId);
+    demoRafId = 0;
+  }
+
+  if (joystickEl) joystickEl.classList.remove('joystick--onStart');
+  mountGameIntoAppShell();
+  resetJoystickVisual();
+  setJoystickHidden(true);
+  setHidden(startUI, true);
+  setHidden(endUI, true);
+  setHidden(stageUI, true);
+  setHidden(chaosEl, true);
+  setHidden(hudRow, true);
+  setQuip('');
+  if (devBackToStartBtn) setHidden(devBackToStartBtn, false);
+
+  world.celebrationMode = false;
+  world.playEnabled = false;
+  world.endReason = '';
+  world.stageIndex = StageId.STAGE_2;
+  applyStageParams(getStageCfg(StageId.STAGE_2));
+  bgCache = null;
+  obstacles.length = 0;
+  particles.length = 0;
+  resizeCanvas();
+  syncWorldToCanvasSize();
+
+  const tbl = findFirstHallTable();
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const tx = tbl ? tbl.x : w * 0.28;
+  const ty = tbl ? tbl.y : h * 0.68;
+  const tr = tbl ? tbl.r : clamp(Math.min(w, h) * 0.055, 34, 52);
+
+  stageTwoIntroScene.tableTx = tx;
+  stageTwoIntroScene.tableTy = ty;
+  stageTwoIntroScene.tableTr = tr;
+
+  const now = nowSec();
+  world.t = now;
+  world.lastT = now;
+  world.dt = 0;
+
+  ofer.x = w * -0.06;
+  ofer.y = ty - tr * 0.42;
+  ofer.vx = 0;
+  ofer.vy = 0;
+
+  tal.visible = false;
+  tal.x = w * 1.12;
+  tal.y = ty - tr * 0.42;
+  tal.vx = 0;
+  tal.vy = 0;
+
+  mushu.x = w * 0.5;
+  mushu.y = h * 1.22;
+  mushu.vx = 0;
+  mushu.vy = 0;
+  mushu.hasRings = false;
+
+  stageTwoIntroScene.active = true;
+  stageTwoIntroScene.startedAt = now;
+  stageTwoIntroScene.durationSec = STAGE2_INTRO_SCENE_DURATION;
+  stageTwoIntroScene.captionIndex = -1;
+  stageTwoIntroScene.ringVisible = false;
+  stageTwoIntroScene.ringStolen = false;
+  stageTwoIntroScene.stealMushuX = null;
+  stageTwoIntroScene.stealMushuY = null;
+  stageTwoIntroScene.ringX = tx;
+  stageTwoIntroScene.ringY = ty - tr * 0.28;
+  stageTwoIntroScene.ringAngle = 0.15;
+
+  state = GameState.CUTSCENE;
+  updateStageTwoIntroScene();
+  startLoopIfNeeded();
+}
+
+function finishStageTwoIntroScene(){
+  stageTwoIntroScene.active = false;
+  stageTwoIntroScene.ringVisible = false;
+  stageTwoIntroScene.ringStolen = false;
+  stageTwoIntroScene.stealMushuX = null;
+  stageTwoIntroScene.stealMushuY = null;
+  hideCutsceneOverlay();
+  setHidden(hudRow, false);
+  startStageImmediately(StageId.STAGE_2);
+}
+
+function updateStageTwoIntroScene(){
+  if (!stageTwoIntroScene.active) return;
+
+  const elapsed = clamp(world.t - stageTwoIntroScene.startedAt, 0, stageTwoIntroScene.durationSec);
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const tx = stageTwoIntroScene.tableTx;
+  const ty = stageTwoIntroScene.tableTy;
+  const tr = stageTwoIntroScene.tableTr;
+
+  const T1 = 2.4;
+  const T2 = 4.0;
+  const T3 = 5.9;
+  const T5 = 8.45;
+  const T6 = 9.55;
+  const TEND = stageTwoIntroScene.durationSec;
+
+  const seatSpread = tr * 1.38 + 30;
+  const oferSitX = tx - seatSpread;
+  const oferSitY = ty - tr * 1.05;
+  const talSitX = tx + seatSpread;
+  const talSitY = ty - tr * 1.05;
+
+  const ringCx = tx;
+  const ringCy = ty - tr * 0.32;
+  const stealDist = tr * 0.48;
+
+  if (elapsed < T1){
+    const k = elapsed / T1;
+    ofer.x = lerp(w * -0.06, oferSitX - tr * 0.42, k);
+    ofer.y = oferSitY + Math.sin(elapsed * 6.8) * 2.2;
+    tal.visible = false;
+    tal.x = w * 1.12;
+    tal.y = talSitY;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+    stageTwoIntroScene.ringVisible = false;
+    stageTwoIntroScene.ringStolen = false;
+  } else if (elapsed < T2){
+    const k = (elapsed - T1) / (T2 - T1);
+    ofer.x = lerp(oferSitX - tr * 0.42, oferSitX, k);
+    ofer.y = oferSitY + Math.sin(elapsed * 5.5) * 1.4;
+    tal.visible = true;
+    tal.x = lerp(w * 1.12, talSitX + tr * 0.42, k);
+    tal.y = talSitY + Math.sin(elapsed * 5.2) * 1.6;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+    stageTwoIntroScene.ringVisible = false;
+  } else if (elapsed < T3){
+    const k = (elapsed - T2) / (T3 - T2);
+    ofer.x = lerp(oferSitX, oferSitX + tr * 0.06, k);
+    ofer.y = oferSitY;
+    tal.x = lerp(talSitX + tr * 0.42, talSitX, k);
+    tal.y = talSitY;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+    stageTwoIntroScene.ringVisible = false;
+  } else if (elapsed < T5){
+    ofer.x = oferSitX + tr * 0.06;
+    ofer.y = oferSitY;
+    tal.x = talSitX;
+    tal.y = talSitY;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+    stageTwoIntroScene.ringVisible = !stageTwoIntroScene.ringStolen;
+    stageTwoIntroScene.ringX = ringCx;
+    stageTwoIntroScene.ringY = ringCy;
+    stageTwoIntroScene.ringAngle = 0.12 + Math.sin(elapsed * 2.1) * 0.06;
+  } else if (elapsed < T6){
+    ofer.x = oferSitX + tr * 0.06 + Math.sin(elapsed * 9) * 2;
+    ofer.y = oferSitY;
+    tal.x = talSitX;
+    tal.y = talSitY;
+    const u = clamp((elapsed - T5) / (T6 - T5), 0, 1);
+    const jump = Math.sin(u * Math.PI);
+    const mushu0x = w * 0.36;
+    const mushu0y = h * 0.94;
+    mushu.x = lerp(mushu0x, ringCx, u);
+    mushu.y = lerp(mushu0y, ringCy - tr * 0.12, u) - jump * tr * 0.5;
+    if (!stageTwoIntroScene.ringStolen){
+      mushu.hasRings = false;
+      stageTwoIntroScene.ringVisible = true;
+      stageTwoIntroScene.ringX = ringCx;
+      stageTwoIntroScene.ringY = ringCy;
+      const reach = Math.hypot(mushu.x - ringCx, mushu.y - ringCy);
+      if (reach <= stealDist || u >= 0.985){
+        stageTwoIntroScene.ringStolen = true;
+        mushu.hasRings = true;
+        stageTwoIntroScene.ringVisible = false;
+        stageTwoIntroScene.stealMushuX = mushu.x;
+        stageTwoIntroScene.stealMushuY = mushu.y;
+      }
+    } else {
+      mushu.hasRings = true;
+      stageTwoIntroScene.ringVisible = false;
+    }
+  } else {
+    ofer.x = oferSitX + tr * 0.06;
+    ofer.y = oferSitY;
+    tal.x = talSitX;
+    tal.y = talSitY;
+    const k = clamp((elapsed - T6) / (TEND - T6), 0, 1);
+    const ease = 1 - Math.pow(1 - k, 2.35);
+    const sx = stageTwoIntroScene.stealMushuX ?? ringCx;
+    const sy = stageTwoIntroScene.stealMushuY ?? (ringCy - tr * 0.12);
+    mushu.x = lerp(sx, w * 1.08, ease);
+    mushu.y = lerp(sy, h * 0.48, ease);
+    mushu.hasRings = true;
+    stageTwoIntroScene.ringVisible = false;
+  }
+
+  ofer.vx = 0;
+  ofer.vy = 0;
+  tal.vx = 0;
+  tal.vy = 0;
+  mushu.vx = 0;
+  mushu.vy = 0;
+
+  let captionIndex = 0;
+  if (elapsed >= T5) captionIndex = 2;
+  else if (elapsed >= T3) captionIndex = 1;
+  if (captionIndex !== stageTwoIntroScene.captionIndex){
+    stageTwoIntroScene.captionIndex = captionIndex;
+    if (captionIndex === 0){
+      setCutsceneOverlay(cutsceneBeatLabel(0, T3, 'באולם'), 'עופר: \"תפסתי את מושו!\" טל מצטרפת, יושבים, טבעת במרכז.');
+    } else if (captionIndex === 1){
+      setCutsceneOverlay(cutsceneBeatLabel(T3, T5, 'מתח'), '\"מה את לא מבינה מה קרה..\"');
+    } else {
+      setCutsceneOverlay(cutsceneBeatLabel(T5, TEND, 'מושו'), 'מושו חוטף. בריחה.');
+    }
+  }
+
+  if (elapsed >= stageTwoIntroScene.durationSec){
+    finishStageTwoIntroScene();
+  }
 }
 
 function scheduleStageStart(stageIndex, { showHowTo }){
@@ -881,27 +1356,8 @@ function initDemoPositions(){
 }
 
 function startGameFromDemoCatch(){
-  if (demoRafId) {
-    cancelAnimationFrame(demoRafId);
-    demoRafId = 0;
-  }
   ensureAudioUnlocked().then(() => { if (audio) audio.sfx.win(); });
-
-  if (joystickEl) joystickEl.classList.remove('joystick--onStart');
-  const appEl = document.getElementById('app');
-  if (canvas && startUIDemoViewport && canvas.parentNode === startUIDemoViewport && appEl) {
-    appEl.insertBefore(canvas, appEl.firstChild);
-  }
-  if (joystickEl && appEl) appEl.appendChild(joystickEl);
-  if (timerEl && hudRow) hudRow.appendChild(timerEl);
-  setJoystickHidden(false);
-
-  state = GameState.PLAYING;
-  setHidden(startUI, true);
-  hasShownStage1HowTo = true;
-  if (devBackToStartBtn) setHidden(devBackToStartBtn, false);
-  startStageImmediately(StageId.STAGE_1);
-  startLoopIfNeeded();
+  startStageOneIntroScene();
 }
 
 function updateDemo(dt){
@@ -1754,9 +2210,13 @@ function resetGameToPlaying(stageIndex){
   resetJoystickVisual();
 
   state = GameState.PLAYING;
+  stageOneIntroScene.active = false;
+  stageTwoIntroScene.active = false;
   setHidden(endUI, true);
   setHidden(startUI, true);
   setHidden(stageUI, true);
+  hideCutsceneOverlay();
+  setHidden(hudRow, false);
   setJoystickHidden(false);
 }
 
@@ -2655,6 +3115,38 @@ function render(){
     ctx.fillText('💍💍', mushu.x, mushu.y - mushuVr - 16);
   }
 
+  if (state === GameState.CUTSCENE && stageOneIntroScene.active && stageOneIntroScene.ringVisible){
+    const pulse = 0.5 + 0.5 * Math.sin(world.t * 8.5);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.beginPath();
+    ctx.ellipse(stageOneIntroScene.ringX, stageOneIntroScene.ringY + 12, 12, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,215,140,${0.12 + 0.18 * pulse})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(stageOneIntroScene.ringX, stageOneIntroScene.ringY, 16 + pulse * 3, 0, Math.PI * 2);
+    ctx.stroke();
+    drawRingIcon(stageOneIntroScene.ringX, stageOneIntroScene.ringY, 12, stageOneIntroScene.ringAngle);
+    ctx.restore();
+  }
+
+  if (state === GameState.CUTSCENE && stageTwoIntroScene.active && stageTwoIntroScene.ringVisible){
+    const pulse = 0.5 + 0.5 * Math.sin(world.t * 8.5);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.beginPath();
+    ctx.ellipse(stageTwoIntroScene.ringX, stageTwoIntroScene.ringY + 10, 11, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,215,140,${0.12 + 0.18 * pulse})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(stageTwoIntroScene.ringX, stageTwoIntroScene.ringY, 15 + pulse * 2.5, 0, Math.PI * 2);
+    ctx.stroke();
+    drawRingIcon(stageTwoIntroScene.ringX, stageTwoIntroScene.ringY, 13, stageTwoIntroScene.ringAngle);
+    ctx.restore();
+  }
+
   // Characters (celebration: only Ofer and Tal dancing)
   drawBody(ofer);
   if (!world.celebrationMode) drawBody(mushu);
@@ -3241,17 +3733,25 @@ function loop(){
     setHidden(rotateUI, true);
   }
 
-  if (state === GameState.PLAYING && !landscape){
+  if (state === GameState.CUTSCENE && !landscape){
+    if (stageOneIntroScene.active) updateStageOneIntroScene(dt);
+    else if (stageTwoIntroScene.active) updateStageTwoIntroScene(dt);
+  } else if (state === GameState.PLAYING && !landscape){
     // Stage start scheduling (uses world clock)
     if (!world.playEnabled && stageStartAt > 0 && world.t >= stageStartAt){
-      const cfg = getStageCfg(pendingStageIndex);
-      applyStageParams(cfg);
-      resetGameToPlaying(pendingStageIndex);
-      world.playEnabled = true;
-      hideStageOverlay();
+      const nextIdx = pendingStageIndex;
       stageStartAt = 0;
       countdownFromAt = 0;
-      if (pendingStageIndex === 0) hasShownStage1HowTo = true;
+      hideStageOverlay();
+      if (nextIdx === StageId.STAGE_2){
+        startStageTwoIntroScene();
+      } else {
+        const cfg = getStageCfg(nextIdx);
+        applyStageParams(cfg);
+        resetGameToPlaying(nextIdx);
+        world.playEnabled = true;
+        if (nextIdx === 0) hasShownStage1HowTo = true;
+      }
     }
 
     if (world.playEnabled) update(dt);
@@ -3333,10 +3833,14 @@ function showOutcome(reason){
 // =============================
 function enterIdle(){
   state = GameState.IDLE;
+  stageOneIntroScene.active = false;
+  stageTwoIntroScene.active = false;
   setHidden(startUI, false);
   setHidden(endUI, true);
   setHidden(rotateUI, true);
   setHidden(stageUI, true);
+  hideCutsceneOverlay();
+  setHidden(hudRow, false);
   if (devBackToStartBtn) setHidden(devBackToStartBtn, true);
   setJoystickHidden(false);
   if (canvas && startUIDemoViewport) startUIDemoViewport.appendChild(canvas);
@@ -3365,18 +3869,23 @@ function enterIdle(){
   demoRafId = requestAnimationFrame(demoLoop);
 }
 
-function goToPlayingAndStartStage(stageIndex) {
+function goToPlayingAndStartStage(stageIndex, opts = {}) {
+  const skipStage1Intro = !!opts.skipStage1Intro;
+  const skipStage2Intro = !!opts.skipStage2Intro;
+  if (stageIndex === StageId.STAGE_1 && !skipStage1Intro){
+    startStageOneIntroScene();
+    return;
+  }
+  if (stageIndex === StageId.STAGE_2 && !skipStage2Intro){
+    startStageTwoIntroScene();
+    return;
+  }
   if (demoRafId) {
     cancelAnimationFrame(demoRafId);
     demoRafId = 0;
   }
   if (joystickEl) joystickEl.classList.remove('joystick--onStart');
-  const appEl = document.getElementById('app');
-  if (canvas && startUIDemoViewport && canvas.parentNode === startUIDemoViewport && appEl) {
-    appEl.insertBefore(canvas, appEl.firstChild);
-  }
-  if (joystickEl && appEl) appEl.appendChild(joystickEl);
-  if (timerEl && hudRow) hudRow.appendChild(timerEl);
+  mountGameIntoAppShell();
   setJoystickHidden(false);
   state = GameState.PLAYING;
   setHidden(startUI, true);
@@ -3412,19 +3921,35 @@ function goToCelebration() {
 startBtn.addEventListener('click', async () => {
   await ensureAudioUnlocked();
   audio.sfx.start();
-  goToPlayingAndStartStage(StageId.STAGE_1);
+  goToPlayingAndStartStage(StageId.STAGE_1, { skipStage1Intro: true });
 }, { passive: true });
 
-function setupDevStageButton(btn, stageIndex) {
+if (introSceneBtn) {
+  introSceneBtn.addEventListener('click', async () => {
+    await ensureAudioUnlocked();
+    audio.sfx.start();
+    startStageOneIntroScene();
+  }, { passive: true });
+}
+
+if (introScene2Btn) {
+  introScene2Btn.addEventListener('click', async () => {
+    await ensureAudioUnlocked();
+    audio.sfx.start();
+    startStageTwoIntroScene();
+  }, { passive: true });
+}
+
+function setupDevStageButton(btn, stageIndex, opts = {}) {
   if (!btn) return;
   btn.addEventListener('click', async () => {
     await ensureAudioUnlocked();
     audio.sfx.start();
-    goToPlayingAndStartStage(stageIndex);
+    goToPlayingAndStartStage(stageIndex, opts);
   }, { passive: true });
 }
-setupDevStageButton(devStage1Btn, StageId.STAGE_1);
-setupDevStageButton(devStage2Btn, StageId.STAGE_2);
+setupDevStageButton(devStage1Btn, StageId.STAGE_1, { skipStage1Intro: true });
+setupDevStageButton(devStage2Btn, StageId.STAGE_2, { skipStage2Intro: true });
 setupDevStageButton(devStage3Btn, StageId.STAGE_3);
 
 if (devCelebrationBtn) {
@@ -3447,6 +3972,10 @@ restartBtn.addEventListener('click', async () => {
 
   // Retry same stage on TIME. After full clear, restart from stage 1.
   const retryStage = world.endReason === 'TIME' ? world.stageIndex : StageId.STAGE_1;
+  if (retryStage === StageId.STAGE_1){
+    startStageOneIntroScene();
+    return;
+  }
   state = GameState.PLAYING;
   setHidden(endUI, true);
   startStageImmediately(retryStage);
