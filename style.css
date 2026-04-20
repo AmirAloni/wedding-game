@@ -701,15 +701,6 @@ canvas#game{
   box-shadow: 0 14px 36px rgba(106, 28, 66, 0.18);
 }
 
-.cutsceneBanner__kicker{
-  display: block;
-  margin-bottom: 6px;
-  font-size: clamp(12px, 3.4vw, 15px);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  color: rgba(106, 28, 66, 0.78);
-}
-
 .cutsceneBanner__text{
   display: block;
   font-size: clamp(17px, 4.8vw, 24px);
@@ -717,6 +708,7 @@ canvas#game{
   line-height: 1.28;
   color: rgba(106, 28, 66, 0.92);
   text-wrap: balance;
+  white-space: pre-line;
 }
 
 .countdown{

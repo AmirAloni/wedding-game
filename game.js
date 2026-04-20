@@ -175,7 +175,6 @@ const endUI = document.getElementById('endUI');
 const rotateUI = document.getElementById('rotateUI');
 const stageUI = document.getElementById('stageUI');
 const cutsceneUI = document.getElementById('cutsceneUI');
-const cutsceneKickerEl = document.getElementById('cutsceneKicker');
 const cutsceneTextEl = document.getElementById('cutsceneText');
 
 const startBtn = document.getElementById('startBtn');
@@ -424,15 +423,13 @@ function startStageImmediately(stageIndex){
 }
 
 function hideCutsceneOverlay(){
-  if (cutsceneKickerEl) cutsceneKickerEl.textContent = '';
   if (cutsceneTextEl) cutsceneTextEl.textContent = '';
   if (cutsceneUI) setHidden(cutsceneUI, true);
 }
 
-function setCutsceneOverlay(kicker, text){
-  if (cutsceneKickerEl) cutsceneKickerEl.textContent = kicker || '';
+function setCutsceneOverlay(text){
   if (cutsceneTextEl) cutsceneTextEl.textContent = text || '';
-  if (cutsceneUI) setHidden(cutsceneUI, !(kicker || text));
+  if (cutsceneUI) setHidden(cutsceneUI, !text);
 }
 
 function cutsceneBeatLabel(t0, t1, headline){
@@ -467,6 +464,8 @@ const stageTwoIntroScene = {
   tableTx: 0,
   tableTy: 0,
   tableTr: 40,
+  /** Ofer's X at cutscene start: beside the table (not off-screen). */
+  oferWalkFromX: 0,
   ringX: 0,
   ringY: 0,
   ringAngle: 0,
@@ -651,13 +650,13 @@ function updateStageOneIntroScene(){
   if (captionIndex !== stageOneIntroScene.captionIndex){
     stageOneIntroScene.captionIndex = captionIndex;
     if (captionIndex === 0){
-      setCutsceneOverlay('10 שניות לפני הבלאגן', 'עופר נכנס לחצר עם הטבעת, בטוח שהכל בשליטה.');
+      setCutsceneOverlay('עופר נכנס לחצר עם הטבעת, בטוח שהכל בשליטה.');
     } else if (captionIndex === 1){
-      setCutsceneOverlay('רגע, מה זה היה?', 'הטבעת מחליקה לו לרצפה... ועופר אפילו לא שם לב.');
+      setCutsceneOverlay('הטבעת מחליקה לו לרצפה...');
     } else if (captionIndex === 2){
-      setCutsceneOverlay('מושו זיהה הזדמנות', 'מושו מגיח משום מקום ובודק אם מישהו ישים לב לשוד קטן.');
+      setCutsceneOverlay('מושו זיהה הזדמנות ');
     } else {
-      setCutsceneOverlay('וזהו, הלך הסדר', 'חטיפה! מושו ברח עם הטבעת. מכאן שלב 1 מתחיל.');
+      setCutsceneOverlay('חטיפה! מושו ברח עם הטבעת.');
     }
   }
 
@@ -886,11 +885,11 @@ function updateStageTwoIntroScene(){
   if (captionIndex !== stageTwoIntroScene.captionIndex){
     stageTwoIntroScene.captionIndex = captionIndex;
     if (captionIndex === 0){
-      setCutsceneOverlay(cutsceneBeatLabel(0, T3, 'באולם'), 'עופר: \"תפסתי את מושו!\" טל מצטרפת, יושבים, טבעת במרכז.');
+      setCutsceneOverlay(`טל מצטרפת (👏🏼👏🏼👏🏼)`);
     } else if (captionIndex === 1){
-      setCutsceneOverlay(cutsceneBeatLabel(T3, T5, 'מתח'), '\"מה את לא מבינה מה קרה..\"');
+      setCutsceneOverlay(`עופר: "את לא מבינה מה קרה.."`);
     } else {
-      setCutsceneOverlay(cutsceneBeatLabel(T5, TEND, 'מושו'), 'מושו חוטף. בריחה.');
+      setCutsceneOverlay(`מושו מכה שנית!`);
     }
   }
 
@@ -1071,13 +1070,11 @@ function updateStageThreeIntroScene(){
   if (captionIndex !== stageThreeIntroScene.captionIndex){
     stageThreeIntroScene.captionIndex = captionIndex;
     if (captionIndex === 0){
-      setCutsceneOverlay(cutsceneBeatLabel(0, T1, 'לחופה'), 'טל ועופר צועדים במעלה החופה.');
+      setCutsceneOverlay(`טל ועופר צועדים במעלה החופה.`);
     } else if (captionIndex === 1){
-      setCutsceneOverlay(cutsceneBeatLabel(T1, T2, 'אין טבעת'), 'רגע… איפה הטבעת?');
+      setCutsceneOverlay(`רגע… איפה הטבעת?`);
     } else if (captionIndex === 2){
-      setCutsceneOverlay(cutsceneBeatLabel(T2, T4, 'מושו'), 'מושו מגיע עם הטבעת — ורץ מסביב כמו כלב שמצא פרי.');
-    } else {
-      setCutsceneOverlay(cutsceneBeatLabel(T4, TEND, 'בריחה'), 'ואז הוא בורח. שלב 3 מתחיל.');
+      setCutsceneOverlay(`מושו! עוד פעם??`);
     }
   }
 
@@ -3314,22 +3311,6 @@ function render(){
     ctx.fillText('💍💍', mushu.x, mushu.y - mushuVr - 16);
   }
 
-  if (state === GameState.CUTSCENE && stageOneIntroScene.active && stageOneIntroScene.ringVisible){
-    const pulse = 0.5 + 0.5 * Math.sin(world.t * 8.5);
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,.18)';
-    ctx.beginPath();
-    ctx.ellipse(stageOneIntroScene.ringX, stageOneIntroScene.ringY + 12, 12, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = `rgba(255,215,140,${0.12 + 0.18 * pulse})`;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(stageOneIntroScene.ringX, stageOneIntroScene.ringY, 16 + pulse * 3, 0, Math.PI * 2);
-    ctx.stroke();
-    drawRingIcon(stageOneIntroScene.ringX, stageOneIntroScene.ringY, 12, stageOneIntroScene.ringAngle);
-    ctx.restore();
-  }
-
   if (state === GameState.CUTSCENE && stageTwoIntroScene.active && stageTwoIntroScene.ringVisible){
     const pulse = 0.5 + 0.5 * Math.sin(world.t * 8.5);
     ctx.save();
@@ -3348,6 +3329,24 @@ function render(){
 
   // Characters (celebration: only Ofer and Tal dancing)
   drawBody(ofer);
+
+  // Stage 1 intro: ring must draw after Ofer so it sits in front (not behind his sprite).
+  if (state === GameState.CUTSCENE && stageOneIntroScene.active && stageOneIntroScene.ringVisible){
+    const pulse = 0.5 + 0.5 * Math.sin(world.t * 8.5);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.beginPath();
+    ctx.ellipse(stageOneIntroScene.ringX, stageOneIntroScene.ringY + 12, 12, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,215,140,${0.12 + 0.18 * pulse})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(stageOneIntroScene.ringX, stageOneIntroScene.ringY, 16 + pulse * 3, 0, Math.PI * 2);
+    ctx.stroke();
+    drawRingIcon(stageOneIntroScene.ringX, stageOneIntroScene.ringY, 12, stageOneIntroScene.ringAngle);
+    ctx.restore();
+  }
+
   if (!world.celebrationMode) drawBody(mushu);
   if (tal.visible) drawBody(tal);
 
