@@ -43,6 +43,7 @@
             <button type="button" id="devCelebration">חגיגה</button>
             <button type="button" id="introSceneBtn">סצנה לפני שלב 1</button>
             <button type="button" id="introScene2Btn">סצנה לפני שלב 2</button>
+            <button type="button" id="introScene3Btn">סצנה לפני שלב 3</button>
           </div>
           <button id="startBtn" class="bigBtn" type="button">התחל</button>
           <div class="tiny">
@@ -93,9 +94,9 @@
       </section>
 
       <section id="cutsceneUI" class="cutsceneUI isHidden" aria-label="סצנת מעבר" aria-live="polite">
-        <div class="cutsceneCard">
-          <div id="cutsceneKicker" class="cutsceneKicker"></div>
-          <div id="cutsceneText" class="cutsceneText"></div>
+        <div id="cutsceneBanner" class="pill pill--chaos cutsceneBanner">
+          <div id="cutsceneKicker" class="cutsceneBanner__kicker"></div>
+          <div id="cutsceneText" class="cutsceneBanner__text"></div>
         </div>
       </section>
 

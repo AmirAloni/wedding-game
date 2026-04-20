@@ -152,6 +152,7 @@ const ARENA_MARGIN = 18;
 const CELEBRATION_DURATION = 10;
 const STAGE1_INTRO_SCENE_DURATION = 10;
 const STAGE2_INTRO_SCENE_DURATION = 12;
+const STAGE3_INTRO_SCENE_DURATION = 20;
 
 // How to change text:
 // - Edit OUTCOMES at the bottom for different absurd endings.
@@ -180,6 +181,7 @@ const cutsceneTextEl = document.getElementById('cutsceneText');
 const startBtn = document.getElementById('startBtn');
 const introSceneBtn = document.getElementById('introSceneBtn');
 const introScene2Btn = document.getElementById('introScene2Btn');
+const introScene3Btn = document.getElementById('introScene3Btn');
 const restartBtn = document.getElementById('restartBtn');
 const devStage1Btn = document.getElementById('devStage1');
 const devStage2Btn = document.getElementById('devStage2');
@@ -483,6 +485,13 @@ function findFirstHallTable(){
   return null;
 }
 
+const stageThreeIntroScene = {
+  active: false,
+  startedAt: 0,
+  durationSec: STAGE3_INTRO_SCENE_DURATION,
+  captionIndex: -1,
+};
+
 function getStageOneIntroRingAnchor(){
   const vr = ofer.r * (ofer.renderScale ?? 1);
   return {
@@ -493,6 +502,7 @@ function getStageOneIntroRingAnchor(){
 
 function startStageOneIntroScene(){
   stageTwoIntroScene.active = false;
+  stageThreeIntroScene.active = false;
   if (demoRafId) {
     cancelAnimationFrame(demoRafId);
     demoRafId = 0;
@@ -658,6 +668,7 @@ function updateStageOneIntroScene(){
 
 function startStageTwoIntroScene(){
   stageOneIntroScene.active = false;
+  stageThreeIntroScene.active = false;
   if (demoRafId) {
     cancelAnimationFrame(demoRafId);
     demoRafId = 0;
@@ -885,6 +896,193 @@ function updateStageTwoIntroScene(){
 
   if (elapsed >= stageTwoIntroScene.durationSec){
     finishStageTwoIntroScene();
+  }
+}
+
+function startStageThreeIntroScene(){
+  stageOneIntroScene.active = false;
+  stageTwoIntroScene.active = false;
+  if (demoRafId) {
+    cancelAnimationFrame(demoRafId);
+    demoRafId = 0;
+  }
+
+  if (joystickEl) joystickEl.classList.remove('joystick--onStart');
+  mountGameIntoAppShell();
+  resetJoystickVisual();
+  setJoystickHidden(true);
+  setHidden(startUI, true);
+  setHidden(endUI, true);
+  setHidden(stageUI, true);
+  setHidden(chaosEl, true);
+  setHidden(hudRow, true);
+  setQuip('');
+  if (devBackToStartBtn) setHidden(devBackToStartBtn, false);
+
+  world.celebrationMode = false;
+  world.playEnabled = false;
+  world.endReason = '';
+  world.stageIndex = StageId.STAGE_3;
+  applyStageParams(getStageCfg(StageId.STAGE_3));
+  bgCache = null;
+  obstacles.length = 0;
+  particles.length = 0;
+  resizeCanvas();
+  syncWorldToCanvasSize();
+
+  const now = nowSec();
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  world.t = now;
+  world.lastT = now;
+  world.dt = 0;
+
+  const cx = w * 0.5;
+  const yWalk0 = h * 0.88;
+  const yWalk1 = h * 0.35;
+
+  ofer.x = w * 0.43;
+  ofer.y = yWalk0;
+  ofer.vx = 0;
+  ofer.vy = 0;
+
+  tal.visible = true;
+  tal.x = w * 0.57;
+  tal.y = yWalk0 - 10;
+  tal.vx = 0;
+  tal.vy = 0;
+
+  mushu.x = w * 0.5;
+  mushu.y = h * 1.22;
+  mushu.vx = 0;
+  mushu.vy = 0;
+  mushu.hasRings = false;
+
+  stageThreeIntroScene.active = true;
+  stageThreeIntroScene.startedAt = now;
+  stageThreeIntroScene.durationSec = STAGE3_INTRO_SCENE_DURATION;
+  stageThreeIntroScene.captionIndex = -1;
+
+  state = GameState.CUTSCENE;
+  updateStageThreeIntroScene();
+  startLoopIfNeeded();
+}
+
+function finishStageThreeIntroScene(){
+  stageThreeIntroScene.active = false;
+  hideCutsceneOverlay();
+  setHidden(hudRow, false);
+  startStageImmediately(StageId.STAGE_3);
+}
+
+function updateStageThreeIntroScene(){
+  if (!stageThreeIntroScene.active) return;
+
+  const elapsed = clamp(world.t - stageThreeIntroScene.startedAt, 0, stageThreeIntroScene.durationSec);
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const cx = w * 0.5;
+  const yWalk0 = h * 0.88;
+  const yWalk1 = h * 0.35;
+  const oferStopX = cx - 32;
+  const talStopX = cx + 32;
+  const pairCx = (oferStopX + talStopX) * 0.5;
+  const pairCy = yWalk1 - 12;
+  const orbitRx = Math.max(112, Math.min(w, h) * 0.24);
+  const orbitRy = orbitRx * 0.52;
+
+  const T1 = 5.5;
+  const T2 = 8.6;
+  const T3 = 9.4;
+  const T4 = 15.48;
+  const TEND = stageThreeIntroScene.durationSec;
+  const orbitLaps = 2.46;
+
+  if (elapsed < T1){
+    const k = elapsed / T1;
+    ofer.x = lerp(w * 0.43, oferStopX, k);
+    ofer.y = lerp(yWalk0, yWalk1, k) + Math.sin(elapsed * 5.5) * 2;
+    tal.visible = true;
+    tal.x = lerp(w * 0.57, talStopX, k);
+    tal.y = lerp(yWalk0 - 10, yWalk1 - 6, k) + Math.sin(elapsed * 5.2 + 0.4) * 2;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+  } else if (elapsed < T2){
+    const t = elapsed - T1;
+    ofer.x = oferStopX + Math.sin(t * 2.8) * 5;
+    ofer.y = yWalk1 + Math.sin(t * 3.1) * 2;
+    tal.x = talStopX + Math.cos(t * 2.6) * 5;
+    tal.y = yWalk1 - 6 + Math.sin(t * 2.9) * 2;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+  } else if (elapsed < T3){
+    const u = clamp((elapsed - T2) / (T3 - T2), 0, 1);
+    const ease = 1 - Math.pow(1 - u, 1.85);
+    ofer.x = oferStopX + Math.sin((elapsed - T2) * 2.2) * 4;
+    ofer.y = yWalk1;
+    tal.x = talStopX + Math.cos((elapsed - T2) * 2.0) * 4;
+    tal.y = yWalk1 - 6;
+    const ang0 = -Math.PI * 0.55;
+    const x0 = pairCx + Math.cos(ang0) * orbitRx;
+    const y0 = pairCy + Math.sin(ang0) * orbitRy;
+    mushu.x = lerp(w * -0.06, x0, ease);
+    mushu.y = lerp(h * 0.72, y0, ease);
+    mushu.hasRings = true;
+  } else if (elapsed < T4){
+    const orbitT = clamp((elapsed - T3) / (T4 - T3), 0, 1);
+    const ang = -Math.PI * 0.55 + orbitT * Math.PI * 2 * orbitLaps;
+    ofer.x = oferStopX + Math.sin((elapsed - T2) * 1.9) * 3;
+    ofer.y = yWalk1;
+    tal.x = talStopX + Math.cos((elapsed - T2) * 1.85) * 3;
+    tal.y = yWalk1 - 6;
+    mushu.x = pairCx + Math.cos(ang) * orbitRx;
+    mushu.y = pairCy + Math.sin(ang) * orbitRy;
+    mushu.hasRings = true;
+  } else {
+    const fleeT = clamp((elapsed - T4) / (TEND - T4), 0, 1);
+    const fleeEase = Math.pow(fleeT, 0.9);
+    const angEnd = -Math.PI * 0.55 + orbitLaps * Math.PI * 2;
+    const flee0x = pairCx + Math.cos(angEnd) * orbitRx;
+    const flee0y = pairCy + Math.sin(angEnd) * orbitRy;
+    ofer.x = oferStopX + Math.sin((elapsed - T2) * 1.6) * 2.5;
+    ofer.y = yWalk1;
+    tal.x = talStopX + Math.cos((elapsed - T2) * 1.55) * 2.5;
+    tal.y = yWalk1 - 6;
+    const fleeTargetX = lerp(flee0x, pairCx, fleeEase * 0.35);
+    const fleeTargetY = h * 1.3;
+    mushu.x = fleeTargetX;
+    mushu.y = lerp(flee0y, fleeTargetY, fleeEase);
+    mushu.hasRings = true;
+  }
+
+  ofer.vx = 0;
+  ofer.vy = 0;
+  tal.vx = 0;
+  tal.vy = 0;
+  mushu.vx = 0;
+  mushu.vy = 0;
+
+  let captionIndex = 0;
+  if (elapsed >= T4) captionIndex = 3;
+  else if (elapsed >= T3) captionIndex = 2;
+  else if (elapsed >= T1) captionIndex = 1;
+  if (captionIndex !== stageThreeIntroScene.captionIndex){
+    stageThreeIntroScene.captionIndex = captionIndex;
+    if (captionIndex === 0){
+      setCutsceneOverlay(cutsceneBeatLabel(0, T1, 'לחופה'), 'טל ועופר צועדים במעלה החופה.');
+    } else if (captionIndex === 1){
+      setCutsceneOverlay(cutsceneBeatLabel(T1, T2, 'אין טבעת'), 'רגע… איפה הטבעת?');
+    } else if (captionIndex === 2){
+      setCutsceneOverlay(cutsceneBeatLabel(T2, T4, 'מושו'), 'מושו מגיע עם הטבעת — ורץ מסביב כמו כלב שמצא פרי.');
+    } else {
+      setCutsceneOverlay(cutsceneBeatLabel(T4, TEND, 'בריחה'), 'ואז הוא בורח. שלב 3 מתחיל.');
+    }
+  }
+
+  if (elapsed >= stageThreeIntroScene.durationSec){
+    finishStageThreeIntroScene();
   }
 }
 
@@ -2212,6 +2410,7 @@ function resetGameToPlaying(stageIndex){
   state = GameState.PLAYING;
   stageOneIntroScene.active = false;
   stageTwoIntroScene.active = false;
+  stageThreeIntroScene.active = false;
   setHidden(endUI, true);
   setHidden(startUI, true);
   setHidden(stageUI, true);
@@ -3736,6 +3935,7 @@ function loop(){
   if (state === GameState.CUTSCENE && !landscape){
     if (stageOneIntroScene.active) updateStageOneIntroScene(dt);
     else if (stageTwoIntroScene.active) updateStageTwoIntroScene(dt);
+    else if (stageThreeIntroScene.active) updateStageThreeIntroScene(dt);
   } else if (state === GameState.PLAYING && !landscape){
     // Stage start scheduling (uses world clock)
     if (!world.playEnabled && stageStartAt > 0 && world.t >= stageStartAt){
@@ -3745,6 +3945,8 @@ function loop(){
       hideStageOverlay();
       if (nextIdx === StageId.STAGE_2){
         startStageTwoIntroScene();
+      } else if (nextIdx === StageId.STAGE_3){
+        startStageThreeIntroScene();
       } else {
         const cfg = getStageCfg(nextIdx);
         applyStageParams(cfg);
@@ -3835,6 +4037,7 @@ function enterIdle(){
   state = GameState.IDLE;
   stageOneIntroScene.active = false;
   stageTwoIntroScene.active = false;
+  stageThreeIntroScene.active = false;
   setHidden(startUI, false);
   setHidden(endUI, true);
   setHidden(rotateUI, true);
@@ -3872,12 +4075,17 @@ function enterIdle(){
 function goToPlayingAndStartStage(stageIndex, opts = {}) {
   const skipStage1Intro = !!opts.skipStage1Intro;
   const skipStage2Intro = !!opts.skipStage2Intro;
+  const skipStage3Intro = !!opts.skipStage3Intro;
   if (stageIndex === StageId.STAGE_1 && !skipStage1Intro){
     startStageOneIntroScene();
     return;
   }
   if (stageIndex === StageId.STAGE_2 && !skipStage2Intro){
     startStageTwoIntroScene();
+    return;
+  }
+  if (stageIndex === StageId.STAGE_3 && !skipStage3Intro){
+    startStageThreeIntroScene();
     return;
   }
   if (demoRafId) {
@@ -3940,6 +4148,14 @@ if (introScene2Btn) {
   }, { passive: true });
 }
 
+if (introScene3Btn) {
+  introScene3Btn.addEventListener('click', async () => {
+    await ensureAudioUnlocked();
+    audio.sfx.start();
+    startStageThreeIntroScene();
+  }, { passive: true });
+}
+
 function setupDevStageButton(btn, stageIndex, opts = {}) {
   if (!btn) return;
   btn.addEventListener('click', async () => {
@@ -3950,7 +4166,7 @@ function setupDevStageButton(btn, stageIndex, opts = {}) {
 }
 setupDevStageButton(devStage1Btn, StageId.STAGE_1, { skipStage1Intro: true });
 setupDevStageButton(devStage2Btn, StageId.STAGE_2, { skipStage2Intro: true });
-setupDevStageButton(devStage3Btn, StageId.STAGE_3);
+setupDevStageButton(devStage3Btn, StageId.STAGE_3, { skipStage3Intro: true });
 
 if (devCelebrationBtn) {
   devCelebrationBtn.addEventListener('click', async () => {
