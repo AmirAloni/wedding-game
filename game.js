@@ -150,8 +150,8 @@ const ARENA_MARGIN = 18;
 
 // Celebration after full clear: dance screen duration (stage 2 look, Ofer+Tal only).
 const CELEBRATION_DURATION = 10;
-const STAGE1_INTRO_SCENE_DURATION = 10;
-const STAGE2_INTRO_SCENE_DURATION = 12;
+const STAGE1_INTRO_SCENE_DURATION = 13;
+const STAGE2_INTRO_SCENE_DURATION = 16;
 const STAGE3_INTRO_SCENE_DURATION = 20;
 
 // How to change text:
@@ -644,7 +644,8 @@ function updateStageOneIntroScene(){
   mushu.vy = 0;
 
   let captionIndex = 0;
-  if (elapsed >= 8.0) captionIndex = 3;
+  if (elapsed >= 9.2) captionIndex = 4;
+  else if (elapsed >= 8.0) captionIndex = 3;
   else if (elapsed >= 5.2) captionIndex = 2;
   else if (elapsed >= 3.2) captionIndex = 1;
   if (captionIndex !== stageOneIntroScene.captionIndex){
@@ -655,8 +656,10 @@ function updateStageOneIntroScene(){
       setCutsceneOverlay('הטבעת מחליקה לו לרצפה...');
     } else if (captionIndex === 2){
       setCutsceneOverlay('מושו זיהה הזדמנות ');
+    } else if (captionIndex === 3){
+      setCutsceneOverlay('חטיפה!');
     } else {
-      setCutsceneOverlay('חטיפה! מושו ברח עם הטבעת.');
+      setCutsceneOverlay('יאללה, כדאי לתפוס את מושו לפני שטל תדע מזה.');
     }
   }
 
@@ -770,8 +773,13 @@ function updateStageTwoIntroScene(){
   const T1 = 2.4;
   const T2 = 4.0;
   const T3 = 5.9;
-  const T5 = 8.45;
-  const T6 = 9.55;
+  /** After Tal sits: first line only (no ring on table yet). */
+  const T_A = 8.0;
+  /** End of Ofer placing ring on table (during "הוצאתי את הטבעת…"). */
+  const T_PLACE_END = 10.2;
+  /** Brief beat: ring sits on table before Mushu snatches at line end. */
+  const T_STEAL_START = 10.48;
+  const T_STEAL_END = 11.85;
   const TEND = stageTwoIntroScene.durationSec;
 
   const seatSpread = tr * 1.38 + 30;
@@ -817,7 +825,33 @@ function updateStageTwoIntroScene(){
     mushu.y = h * 1.22;
     mushu.hasRings = false;
     stageTwoIntroScene.ringVisible = false;
-  } else if (elapsed < T5){
+  } else if (elapsed < T_A){
+    ofer.x = oferSitX + tr * 0.06;
+    ofer.y = oferSitY;
+    tal.x = talSitX;
+    tal.y = talSitY;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+    stageTwoIntroScene.ringVisible = false;
+    stageTwoIntroScene.ringStolen = false;
+  } else if (elapsed < T_PLACE_END){
+    ofer.x = oferSitX + tr * 0.06;
+    ofer.y = oferSitY;
+    tal.x = talSitX;
+    tal.y = talSitY;
+    mushu.x = w * 0.5;
+    mushu.y = h * 1.22;
+    mushu.hasRings = false;
+    const k = clamp((elapsed - T_A) / (T_PLACE_END - T_A), 0, 1);
+    const ease = k * k * (3 - 2 * k);
+    const handX = ofer.x + tr * 0.38;
+    const handY = ofer.y - tr * 0.48;
+    stageTwoIntroScene.ringVisible = true;
+    stageTwoIntroScene.ringX = lerp(handX, ringCx, ease);
+    stageTwoIntroScene.ringY = lerp(handY, ringCy, ease);
+    stageTwoIntroScene.ringAngle = 0.12 + ease * 2.2 + Math.sin(elapsed * 5.5) * 0.08;
+  } else if (elapsed < T_STEAL_START){
     ofer.x = oferSitX + tr * 0.06;
     ofer.y = oferSitY;
     tal.x = talSitX;
@@ -829,12 +863,12 @@ function updateStageTwoIntroScene(){
     stageTwoIntroScene.ringX = ringCx;
     stageTwoIntroScene.ringY = ringCy;
     stageTwoIntroScene.ringAngle = 0.12 + Math.sin(elapsed * 2.1) * 0.06;
-  } else if (elapsed < T6){
+  } else if (elapsed < T_STEAL_END){
     ofer.x = oferSitX + tr * 0.06 + Math.sin(elapsed * 9) * 2;
     ofer.y = oferSitY;
     tal.x = talSitX;
     tal.y = talSitY;
-    const u = clamp((elapsed - T5) / (T6 - T5), 0, 1);
+    const u = clamp((elapsed - T_STEAL_START) / (T_STEAL_END - T_STEAL_START), 0, 1);
     const jump = Math.sin(u * Math.PI);
     const mushu0x = w * 0.36;
     const mushu0y = h * 0.94;
@@ -862,7 +896,7 @@ function updateStageTwoIntroScene(){
     ofer.y = oferSitY;
     tal.x = talSitX;
     tal.y = talSitY;
-    const k = clamp((elapsed - T6) / (TEND - T6), 0, 1);
+    const k = clamp((elapsed - T_STEAL_END) / (TEND - T_STEAL_END), 0, 1);
     const ease = 1 - Math.pow(1 - k, 2.35);
     const sx = stageTwoIntroScene.stealMushuX ?? ringCx;
     const sy = stageTwoIntroScene.stealMushuY ?? (ringCy - tr * 0.12);
@@ -880,7 +914,8 @@ function updateStageTwoIntroScene(){
   mushu.vy = 0;
 
   let captionIndex = 0;
-  if (elapsed >= T5) captionIndex = 2;
+  if (elapsed >= T_STEAL_END) captionIndex = 3;
+  else if (elapsed >= T_A) captionIndex = 2;
   else if (elapsed >= T3) captionIndex = 1;
   if (captionIndex !== stageTwoIntroScene.captionIndex){
     stageTwoIntroScene.captionIndex = captionIndex;
@@ -888,6 +923,8 @@ function updateStageTwoIntroScene(){
       setCutsceneOverlay(`טל מצטרפת (👏🏼👏🏼👏🏼)`);
     } else if (captionIndex === 1){
       setCutsceneOverlay(`עופר: "את לא מבינה מה קרה.."`);
+    } else if (captionIndex === 2){
+      setCutsceneOverlay(`עופר: "הוצאתי את הטבעת.. ככה.. ואז"`);
     } else {
       setCutsceneOverlay(`מושו מכה שנית!`);
     }
@@ -3311,6 +3348,10 @@ function render(){
     ctx.fillText('💍💍', mushu.x, mushu.y - mushuVr - 16);
   }
 
+  // Characters (celebration: only Ofer and Tal dancing)
+  drawBody(ofer);
+
+  // Stage 2 intro: ring travels from Ofer to table — draw after Ofer so it reads in front.
   if (state === GameState.CUTSCENE && stageTwoIntroScene.active && stageTwoIntroScene.ringVisible){
     const pulse = 0.5 + 0.5 * Math.sin(world.t * 8.5);
     ctx.save();
@@ -3326,9 +3367,6 @@ function render(){
     drawRingIcon(stageTwoIntroScene.ringX, stageTwoIntroScene.ringY, 13, stageTwoIntroScene.ringAngle);
     ctx.restore();
   }
-
-  // Characters (celebration: only Ofer and Tal dancing)
-  drawBody(ofer);
 
   // Stage 1 intro: ring must draw after Ofer so it sits in front (not behind his sprite).
   if (state === GameState.CUTSCENE && stageOneIntroScene.active && stageOneIntroScene.ringVisible){
