@@ -83,6 +83,30 @@
         </div>
       </section>
 
+      <section id="celebrationUI" class="celebrationUI isHidden" aria-label="חגיגת סיום אינטראקטיבית">
+        <div class="celebrationBottomStack">
+          <div id="celebrationResultDock" class="celebrationResultDock">
+            <button
+              id="celebrationResultBtn"
+              class="celebrationStackBtn celebrationStackBtn--warm"
+              type="button"
+              aria-expanded="false"
+              aria-controls="celebrationResultDrawer"
+            >
+              <span class="celebrationStackBtn__label">תוצאה</span>
+              <span id="celebrationResultBadge" class="celebrationStackBtn__sub">0 נק׳</span>
+            </button>
+            <aside id="celebrationResultDrawer" class="celebrationResultPanel" aria-live="polite">
+              <div id="celebrationResultTitle" class="celebrationResultTitle">החתונה ניצלה</div>
+              <div id="celebrationResultSummary" class="celebrationResultSummary"></div>
+              <div id="celebrationScore" class="scoreBox celebrationScoreBox" aria-label="תוצאה סופית"></div>
+            </aside>
+          </div>
+
+          <button id="celebrationRestartBtn" class="celebrationStackBtn celebrationStackBtn--restart" type="button">להתחיל מחדש</button>
+        </div>
+      </section>
+
       <!-- Stage intro / between stages -->
       <section id="stageUI" class="overlay overlay--center isHidden" aria-label="מסך שלב">
         <div class="panel">

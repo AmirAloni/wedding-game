@@ -7,124 +7,139 @@
 const oferStickerImg = new Image();
 oferStickerImg.decoding = 'async';
 oferStickerImg.loading = 'eager';
-oferStickerImg.src = 'assets/ofer.webp';
+oferStickerImg.src = 'assets/characters/ofer.webp';
 
 const mushuStickerImg = new Image();
 mushuStickerImg.decoding = 'async';
 mushuStickerImg.loading = 'eager';
-mushuStickerImg.src = 'assets/Mushu.webp';
+mushuStickerImg.src = 'assets/characters/mushu.webp';
 
 const talStickerImg = new Image();
 talStickerImg.decoding = 'async';
 talStickerImg.loading = 'eager';
-talStickerImg.src = 'assets/Tal.webp';
+talStickerImg.src = 'assets/characters/tal.webp';
 
 // Bride rage stickers (used during ChaosEvent.BRIDE_RAGE)
 const brideRageOneImg = new Image();
 brideRageOneImg.decoding = 'async';
 brideRageOneImg.loading = 'eager';
-brideRageOneImg.src = 'assets/bride-rage-one.webp';
+brideRageOneImg.src = 'assets/events/bride-rage-one.webp';
 
 const brideRageTwoImg = new Image();
 brideRageTwoImg.decoding = 'async';
 brideRageTwoImg.loading = 'eager';
-brideRageTwoImg.src = 'assets/bride-rage-two.webp';
+brideRageTwoImg.src = 'assets/events/bride-rage-two.webp';
 
 // Stage 1 (yard) props
 const levelOneBgImg = new Image();
 levelOneBgImg.decoding = 'async';
 levelOneBgImg.loading = 'eager';
-levelOneBgImg.src = 'assets/level-one-backgroung.jpg';
+levelOneBgImg.src = 'assets/stages/stage-1/background.jpg';
 levelOneBgImg.addEventListener('load', () => { bgCache = null; }, { once: true });
 
 const palmTreeImg = new Image();
 palmTreeImg.decoding = 'async';
 palmTreeImg.loading = 'eager';
-palmTreeImg.src = 'assets/palm-tree.webp';
+palmTreeImg.src = 'assets/stages/stage-1/props/palm-tree.webp';
 
 const treeImg = new Image();
 treeImg.decoding = 'async';
 treeImg.loading = 'eager';
-treeImg.src = 'assets/tree.webp';
+treeImg.src = 'assets/stages/stage-1/props/tree.webp';
 
 const pinkBushImg = new Image();
 pinkBushImg.decoding = 'async';
 pinkBushImg.loading = 'eager';
-pinkBushImg.src = 'assets/pink-bush.webp';
+pinkBushImg.src = 'assets/stages/stage-1/props/pink-bush.webp';
 
 const tableOutsideImg = new Image();
 tableOutsideImg.decoding = 'async';
 tableOutsideImg.loading = 'eager';
-tableOutsideImg.src = 'assets/table-outside.webp';
+tableOutsideImg.src = 'assets/stages/stage-1/props/table-outside.webp';
 
 // Stage 2 (hall) props
 const barImg = new Image();
 barImg.decoding = 'async';
 barImg.loading = 'eager';
-barImg.src = 'assets/bar.webp';
+barImg.src = 'assets/stages/stage-2/props/bar.webp';
 
 const indoorTableImg = new Image();
 indoorTableImg.decoding = 'async';
 indoorTableImg.loading = 'eager';
-indoorTableImg.src = 'assets/indoor-table.webp';
+indoorTableImg.src = 'assets/stages/stage-2/props/indoor-table.webp';
 
 const leftSpeakerImg = new Image();
 leftSpeakerImg.decoding = 'async';
 leftSpeakerImg.loading = 'eager';
-leftSpeakerImg.src = 'assets/left-speaker.webp';
+leftSpeakerImg.src = 'assets/stages/stage-2/props/left-speaker.webp';
 
 const rightSpeakerImg = new Image();
 rightSpeakerImg.decoding = 'async';
 rightSpeakerImg.loading = 'eager';
-rightSpeakerImg.src = 'assets/right-speaker.webp';
+rightSpeakerImg.src = 'assets/stages/stage-2/props/right-speaker.webp';
 
 const levelTwoBgImg = new Image();
 levelTwoBgImg.decoding = 'async';
 levelTwoBgImg.loading = 'eager';
-levelTwoBgImg.src = 'assets/level-two-backgroung.jpg';
+levelTwoBgImg.src = 'assets/stages/stage-2/background.jpg';
 levelTwoBgImg.addEventListener('load', () => { bgCache = null; }, { once: true });
 
 // Stage 3 (chuppah) props
 const levelThreeBgImg = new Image();
 levelThreeBgImg.decoding = 'async';
 levelThreeBgImg.loading = 'eager';
-levelThreeBgImg.src = 'assets/level-three-backgroung.jpeg';
+levelThreeBgImg.src = 'assets/stages/stage-3/background.jpeg';
 levelThreeBgImg.addEventListener('load', () => { bgCache = null; }, { once: true });
 
 const hupaImg = new Image();
 hupaImg.decoding = 'async';
 hupaImg.loading = 'eager';
-hupaImg.src = 'assets/hupa.png';
+hupaImg.src = 'assets/stages/stage-3/props/hupa.png';
 
 const fountainImg = new Image();
 fountainImg.decoding = 'async';
 fountainImg.loading = 'eager';
-fountainImg.src = 'assets/fountain.png';
-
-const whiteCarpetImg = new Image();
-whiteCarpetImg.decoding = 'async';
-whiteCarpetImg.loading = 'eager';
-whiteCarpetImg.src = 'assets/white-carpet.jpg';
+fountainImg.src = 'assets/stages/stage-3/props/fountain.png';
 
 const whiteFlowersImg = new Image();
 whiteFlowersImg.decoding = 'async';
 whiteFlowersImg.loading = 'eager';
-whiteFlowersImg.src = 'assets/white-flowers.png';
+whiteFlowersImg.src = 'assets/stages/stage-3/props/white-flowers.png';
 
 const whiteTreeImg = new Image();
 whiteTreeImg.decoding = 'async';
 whiteTreeImg.loading = 'eager';
-whiteTreeImg.src = 'assets/white-tree.png';
+whiteTreeImg.src = 'assets/stages/stage-3/props/white-tree.png';
 
 const pinkTreeImg = new Image();
 pinkTreeImg.decoding = 'async';
 pinkTreeImg.loading = 'eager';
-pinkTreeImg.src = 'assets/pink-tree.png';
+pinkTreeImg.src = 'assets/stages/stage-3/props/pink-tree.png';
 
 const woodStageImg = new Image();
 woodStageImg.decoding = 'async';
 woodStageImg.loading = 'eager';
-woodStageImg.src = 'assets/wood-stage.png';
+woodStageImg.src = 'assets/stages/stage-3/props/wood-stage.png';
+
+const bottleAcaiImg = new Image();
+bottleAcaiImg.decoding = 'async';
+bottleAcaiImg.loading = 'eager';
+bottleAcaiImg.src = 'assets/stages/stage-3/props/bottles/Acai.webp';
+
+const bottleArakImg = new Image();
+bottleArakImg.decoding = 'async';
+bottleArakImg.loading = 'eager';
+bottleArakImg.src = 'assets/stages/stage-3/props/bottles/Arak.webp';
+
+const bottleGinImg = new Image();
+bottleGinImg.decoding = 'async';
+bottleGinImg.loading = 'eager';
+bottleGinImg.src = 'assets/stages/stage-3/props/bottles/Gin.webp';
+
+const bottleTubiImg = new Image();
+bottleTubiImg.decoding = 'async';
+bottleTubiImg.loading = 'eager';
+bottleTubiImg.src = 'assets/stages/stage-3/props/bottles/Tubi60.webp';
 
 // =============================
 // Constants (tweak here)
@@ -148,8 +163,13 @@ const CHAOS_BANNER_VISIBLE_SEC = 3;
 const DEFAULT_MUSHU_BASE_SPEED = 330;
 const ARENA_MARGIN = 18;
 
-// Celebration after full clear: dance screen duration (stage 2 look, Ofer+Tal only).
-const CELEBRATION_DURATION = 10;
+// Celebration after full clear: interactive hall party with clickable bar bottles.
+const CELEBRATION_DRINK_SEC = 1.7;
+const CELEBRATION_CONFETTI_INTERVAL_SEC = 1.1;
+const CELEBRATION_WALK_SPEED = 720;
+const CELEBRATION_STEAL_EVERY_CLICKS = 4;
+const CELEBRATION_STOLEN_BOTTLE_RETURN_SEC = 4.2;
+const CELEBRATION_MUSHU_STEAL_SPEED = 500;
 const STAGE1_INTRO_SCENE_DURATION = 13;
 const STAGE2_INTRO_SCENE_DURATION = 16;
 const STAGE3_INTRO_SCENE_DURATION = 20;
@@ -200,6 +220,15 @@ const stageTextEl = document.getElementById('stageText');
 const stageCountdownEl = document.getElementById('stageCountdown');
 const stageTinyEl = document.getElementById('stageTiny');
 const endScoreEl = document.getElementById('endScore');
+const celebrationUI = document.getElementById('celebrationUI');
+const celebrationResultDockEl = document.getElementById('celebrationResultDock');
+const celebrationResultDrawerEl = document.getElementById('celebrationResultDrawer');
+const celebrationResultBtn = document.getElementById('celebrationResultBtn');
+const celebrationResultBadgeEl = document.getElementById('celebrationResultBadge');
+const celebrationResultTitleEl = document.getElementById('celebrationResultTitle');
+const celebrationResultSummaryEl = document.getElementById('celebrationResultSummary');
+const celebrationScoreEl = document.getElementById('celebrationScore');
+const celebrationRestartBtn = document.getElementById('celebrationRestartBtn');
 
 // On-screen joystick (movement)
 const joystickEl = document.getElementById('joystick');
@@ -351,14 +380,16 @@ function awardCatchScore(stageIndex){
 }
 
 function renderEndScore(){
-  if (!endScoreEl) return;
   const lines = runScore.stages.map((s, i) => {
     const label = `שלב ${i + 1}`;
     if (s.points == null) return `${label}: —`;
     return `${label}: ${s.points} נק׳ • ${s.timeSpentSec.toFixed(1)}`;
   });
   lines.push(`סה״כ: ${runScore.totalPoints} נק׳`);
-  endScoreEl.textContent = lines.join('\n');
+  const scoreText = lines.join('\n');
+  if (endScoreEl) endScoreEl.textContent = scoreText;
+  if (celebrationScoreEl) celebrationScoreEl.textContent = scoreText;
+  if (celebrationResultBadgeEl) celebrationResultBadgeEl.textContent = `${runScore.totalPoints} נק׳`;
 }
 
 let hasShownStage1HowTo = false;
@@ -1559,6 +1590,17 @@ if (joystickBaseEl){
   joystickBaseEl.addEventListener('pointercancel', onJoystickPointerUp, { passive: true });
 }
 
+function onCelebrationCanvasPointerDown(e){
+  if (!world.celebrationMode || state !== GameState.PLAYING) return;
+  const pt = clientPointToCanvas(e.clientX, e.clientY);
+  const slot = getCelebrationBottleAtPoint(pt.x, pt.y);
+  if (!slot) return;
+  e.preventDefault();
+  handleCelebrationBottleClick(slot);
+}
+
+canvas.addEventListener('pointerdown', onCelebrationCanvasPointerDown, { passive: false });
+
 // =============================
 // Demo on start screen: joystick moves Ofer, catch Mushu
 // =============================
@@ -1884,6 +1926,339 @@ const tal = {
   label: 'טל 👰',
   visible: true,
 };
+
+const CELEBRATION_BOTTLES = [
+  { id: 'acai', label: 'אסאי', img: bottleAcaiImg },
+  { id: 'arak', label: 'ערק', img: bottleArakImg },
+  { id: 'gin', label: 'ג׳ין', img: bottleGinImg },
+  { id: 'tubi', label: 'טובי 60', img: bottleTubiImg },
+];
+
+const celebration = {
+  scoreDrawerOpen: false,
+  bottleAssignments: new Map(),
+  clickStreak: 0,
+  theftBottleId: null,
+  theftReturnAt: 0,
+  mushuTheftState: 'idle',
+  mushuTargetX: 0,
+  mushuTargetY: 0,
+  mushuExitX: 0,
+  mushuExitY: 0,
+  mushuCarryBottleId: null,
+};
+
+function getCelebrationBottleAsset(id){
+  return CELEBRATION_BOTTLES.find((bottle) => bottle.id === id) || null;
+}
+
+function setCelebrationUiVisible(visible){
+  if (!celebrationUI) return;
+  setHidden(celebrationUI, !visible);
+}
+
+function setCelebrationResultDrawerOpen(open){
+  celebration.scoreDrawerOpen = !!open;
+  if (celebrationResultDockEl) celebrationResultDockEl.classList.toggle('isOpen', celebration.scoreDrawerOpen);
+  if (celebrationResultBtn) celebrationResultBtn.setAttribute('aria-expanded', celebration.scoreDrawerOpen ? 'true' : 'false');
+}
+
+function initCelebrationActorState(actor){
+  actor.celebrationState = 'dance';
+  actor.celebrationBottleId = null;
+  actor.celebrationDrinkUntil = 0;
+  actor.celebrationTargetX = actor.x;
+  actor.celebrationTargetY = actor.y;
+}
+
+function resetCelebrationState(){
+  celebration.bottleAssignments.clear();
+  celebration.clickStreak = 0;
+  celebration.theftBottleId = null;
+  celebration.theftReturnAt = 0;
+  celebration.mushuTheftState = 'idle';
+  celebration.mushuCarryBottleId = null;
+  initCelebrationActorState(ofer);
+  initCelebrationActorState(tal);
+  setCelebrationResultDrawerOpen(false);
+  setCelebrationUiVisible(false);
+}
+
+function clearCelebrationTheft(){
+  celebration.theftBottleId = null;
+  celebration.theftReturnAt = 0;
+  celebration.mushuTheftState = 'idle';
+  celebration.mushuCarryBottleId = null;
+}
+
+function getCelebrationDanceAnchor(actor, t = world.t || 0){
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const cx = w * 0.5;
+  const cy = h * 0.39;
+  const radius = 48;
+  const speed = 0.75;
+  const phase = (actor === tal) ? Math.PI : 0;
+  return {
+    x: cx + Math.cos(t * speed + phase) * radius,
+    y: cy + Math.sin(t * speed * 0.85 + phase) * (radius * 0.5),
+  };
+}
+
+function getCelebrationBarObstacle(){
+  if ((world.stageIndex ?? -1) !== StageId.STAGE_2) return null;
+  if (!obstacles.length) buildObstacles();
+  return obstacles.find((o) => o.type === 'bar') || null;
+}
+
+function getCelebrationBottleSlots(){
+  const bar = getCelebrationBarObstacle();
+  if (!bar) return [];
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const count = CELEBRATION_BOTTLES.length;
+  const featuredIndex = Math.floor((world.t || 0) * 1.45) % count;
+  const usableLeft = bar.x + bar.w * 0.20;
+  const usableRight = bar.x + bar.w * 0.80;
+  const shelfY = bar.y + bar.h * 0.44;
+  // Stand just in front of the bar (small gap below bar hitbox — closer than before).
+  const standBelowBar = clamp(h * 0.028, 12, 26);
+  const actorY = clamp(bar.y + bar.h + standBelowBar, ARENA_MARGIN + 34, h - ARENA_MARGIN - 34);
+
+  return CELEBRATION_BOTTLES.map((bottle, index) => {
+    const mix = (count <= 1) ? 0.5 : (index / (count - 1));
+    const x = lerp(usableLeft, usableRight, mix);
+    const phase = (world.t || 0) * 5.1 + index * 0.75;
+    const featured = index === featuredIndex;
+    const bob = featured ? (Math.sin(phase * 1.6) * 6 - 7) : (Math.sin(phase) * 1.8);
+    const maxW = clamp(bar.w * 0.135, 38, 82);
+    const maxH = clamp(bar.h * 1.04, 60, 130);
+    const renderRect = isImgReady(bottle.img)
+      ? imgContainDims(bottle.img, x, shelfY + bob, maxW, maxH, 'bottom')
+      : { x: x - maxW / 2, y: shelfY + bob - maxH, w: maxW, h: maxH };
+    return {
+      ...bottle,
+      x,
+      y: shelfY + bob,
+      featured,
+      glow: featured ? 0.92 : (0.32 + 0.12 * Math.sin(phase)),
+      renderRect,
+      targetX: clamp(x, ARENA_MARGIN + 30, w - ARENA_MARGIN - 30),
+      targetY: actorY,
+      occupiedBy: celebration.bottleAssignments.get(bottle.id) || null,
+      blockedByTheft: bottle.id === celebration.theftBottleId,
+      hiddenByTheft: bottle.id === celebration.mushuCarryBottleId,
+    };
+  });
+}
+
+function getCelebrationBottleAtPoint(x, y){
+  const slots = getCelebrationBottleSlots();
+  for (let i = slots.length - 1; i >= 0; i--){
+    const slot = slots[i];
+    if (slot.occupiedBy || slot.blockedByTheft || slot.hiddenByTheft) continue;
+    const pad = 18;
+    const r = slot.renderRect;
+    if (x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad) return slot;
+  }
+  return null;
+}
+
+function moveBodyToward(body, tx, ty, speed, dt){
+  const dx = tx - body.x;
+  const dy = ty - body.y;
+  const d = Math.hypot(dx, dy);
+  if (d <= Math.max(4, speed * dt)){
+    body.x = tx;
+    body.y = ty;
+    body.vx = 0;
+    body.vy = 0;
+    return true;
+  }
+  const inv = 1 / (d || 1);
+  body.x += dx * inv * speed * dt;
+  body.y += dy * inv * speed * dt;
+  body.vx = 0;
+  body.vy = 0;
+  return false;
+}
+
+function pickCelebrationActor(slot){
+  const freeActors = [ofer, tal].filter((actor) => actor.celebrationState === 'dance');
+  if (!freeActors.length) return null;
+  freeActors.sort((a, b) => Math.abs(a.x - slot.targetX) - Math.abs(b.x - slot.targetX));
+  return freeActors[0];
+}
+
+function assignCelebrationDrink(slot){
+  if (!slot || celebration.bottleAssignments.has(slot.id) || celebration.theftBottleId === slot.id) return false;
+  const actor = pickCelebrationActor(slot);
+  if (!actor) return false;
+  celebration.bottleAssignments.set(slot.id, actor);
+  actor.celebrationState = 'toBottle';
+  actor.celebrationBottleId = slot.id;
+  actor.celebrationDrinkUntil = 0;
+  actor.celebrationTargetX = slot.targetX;
+  actor.celebrationTargetY = slot.targetY;
+  spawnConfetti(12, slot.targetX, slot.targetY - 26, 140);
+  return true;
+}
+
+function startCelebrationBottleTheft(slot){
+  const w = world.w || canvas.width;
+  const side = (slot.targetX < w * 0.5) ? -1 : 1;
+  celebration.clickStreak = 0;
+  celebration.theftBottleId = slot.id;
+  celebration.theftReturnAt = 0;
+  celebration.mushuCarryBottleId = null;
+  celebration.mushuTheftState = 'entering';
+  celebration.mushuTargetX = slot.targetX;
+  celebration.mushuTargetY = slot.targetY + 2;
+  celebration.mushuExitX = (side < 0) ? (-mushu.r * 4) : (w + mushu.r * 4);
+  celebration.mushuExitY = clamp(slot.targetY + 18, ARENA_MARGIN + mushu.r, (world.h || canvas.height) - ARENA_MARGIN - mushu.r);
+  mushu.x = (side < 0) ? (-mushu.r * 4) : (w + mushu.r * 4);
+  mushu.y = celebration.mushuExitY;
+  mushu.vx = 0;
+  mushu.vy = 0;
+  mushu.hasRings = false;
+  spawnConfetti(18, slot.targetX, slot.targetY - 18, 180);
+}
+
+function handleCelebrationBottleClick(slot){
+  if (!slot || slot.occupiedBy || slot.blockedByTheft || slot.hiddenByTheft) return false;
+  celebration.clickStreak += 1;
+  if (celebration.clickStreak >= CELEBRATION_STEAL_EVERY_CLICKS && celebration.mushuTheftState === 'idle' && !celebration.theftBottleId){
+    startCelebrationBottleTheft(slot);
+    return true;
+  }
+  const assigned = assignCelebrationDrink(slot);
+  if (!assigned) celebration.clickStreak = Math.max(0, celebration.clickStreak - 1);
+  return assigned;
+}
+
+function updateCelebrationActor(actor, anchor, slots, dt){
+  const activeSlot = actor.celebrationBottleId
+    ? (slots.find((slot) => slot.id === actor.celebrationBottleId) || null)
+    : null;
+  if (activeSlot){
+    actor.celebrationTargetX = activeSlot.targetX;
+    actor.celebrationTargetY = activeSlot.targetY;
+  }
+
+  if (actor.celebrationState === 'toBottle'){
+    if (!activeSlot){
+      actor.celebrationState = 'returning';
+    } else if (moveBodyToward(actor, actor.celebrationTargetX, actor.celebrationTargetY, CELEBRATION_WALK_SPEED, dt)){
+      actor.celebrationState = 'drinking';
+      actor.celebrationDrinkUntil = world.t + CELEBRATION_DRINK_SEC;
+    }
+    return;
+  }
+
+  if (actor.celebrationState === 'drinking'){
+    actor.x = lerp(actor.x, actor.celebrationTargetX, clamp(dt * 10, 0, 1));
+    actor.y = actor.celebrationTargetY + Math.sin((world.t || 0) * 8.5 + (actor === tal ? 1.4 : 0)) * 4;
+    if ((world.t || 0) >= (actor.celebrationDrinkUntil || 0)){
+      if (actor.celebrationBottleId) celebration.bottleAssignments.delete(actor.celebrationBottleId);
+      actor.celebrationBottleId = null;
+      actor.celebrationState = 'returning';
+    }
+    return;
+  }
+
+  if (actor.celebrationState === 'returning'){
+    if (moveBodyToward(actor, anchor.x, anchor.y, CELEBRATION_WALK_SPEED * 1.06, dt)){
+      initCelebrationActorState(actor);
+    }
+    return;
+  }
+
+  actor.x = anchor.x;
+  actor.y = anchor.y;
+  actor.vx = 0;
+  actor.vy = 0;
+}
+
+function updateCelebrationMushuTheft(dt, slots){
+  if (celebration.theftBottleId && celebration.theftReturnAt > 0 && world.t >= celebration.theftReturnAt){
+    const bottleSlot = slots.find((slot) => slot.id === celebration.theftBottleId);
+    if (bottleSlot) spawnConfetti(14, bottleSlot.x, bottleSlot.y - 10, 150);
+    clearCelebrationTheft();
+    return;
+  }
+
+  if (!celebration.theftBottleId || celebration.mushuTheftState === 'idle') return;
+
+  if (celebration.mushuTheftState === 'entering'){
+    if (moveBodyToward(mushu, celebration.mushuTargetX, celebration.mushuTargetY, CELEBRATION_MUSHU_STEAL_SPEED, dt)){
+      celebration.mushuCarryBottleId = celebration.theftBottleId;
+      celebration.theftReturnAt = world.t + CELEBRATION_STOLEN_BOTTLE_RETURN_SEC;
+      celebration.mushuTheftState = 'escaping';
+      spawnConfetti(16, mushu.x, mushu.y - 12, 180);
+    }
+    return;
+  }
+
+  if (celebration.mushuTheftState === 'escaping'){
+    const done = moveBodyToward(mushu, celebration.mushuExitX, celebration.mushuExitY, CELEBRATION_MUSHU_STEAL_SPEED * 1.06, dt);
+    const farEnough = (celebration.mushuExitX < 0)
+      ? (mushu.x <= celebration.mushuExitX + 6)
+      : (mushu.x >= celebration.mushuExitX - 6);
+    if (done || farEnough){
+      celebration.mushuTheftState = 'idle';
+    }
+  }
+}
+
+function drawCelebrationBottles(){
+  const slots = getCelebrationBottleSlots();
+  if (!slots.length) return;
+
+  for (const slot of slots){
+    if (slot.hiddenByTheft) continue;
+    const r = slot.renderRect;
+    ctx.save();
+    ctx.fillStyle = 'rgba(18,49,28,.14)';
+    ctx.beginPath();
+    ctx.ellipse(slot.x, slot.y + 8, Math.max(12, r.w * 0.36), Math.max(5, r.w * 0.14), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (isImgReady(slot.img)){
+      ctx.drawImage(slot.img, r.x, r.y, r.w, r.h);
+    } else {
+      drawRoundedRect(ctx, r.x, r.y, r.w, r.h, 8, 'rgba(255,250,243,.68)', 'rgba(18,49,28,.14)');
+    }
+    ctx.restore();
+  }
+}
+
+function drawCelebrationMushuBottle(){
+  if (!celebration.mushuCarryBottleId) return;
+  const bottle = getCelebrationBottleAsset(celebration.mushuCarryBottleId);
+  if (!bottle) return;
+  const vr = mushu.r * (mushu.renderScale ?? 1);
+  const drawW = vr * 1.45;
+  const drawH = vr * 2.05;
+  const x = mushu.x + vr * 0.58;
+  const y = mushu.y + vr * 0.12;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(0.28);
+  if (isImgReady(bottle.img)){
+    ctx.drawImage(bottle.img, -drawW * 0.5, -drawH * 0.78, drawW, drawH);
+  } else {
+    drawRoundedRect(ctx, -drawW * 0.22, -drawH * 0.72, drawW * 0.44, drawH * 0.72, 6, 'rgba(255,250,243,.74)', 'rgba(18,49,28,.14)');
+  }
+  ctx.restore();
+}
+
+function clientPointToCanvas(clientX, clientY){
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left) * (canvas.width / Math.max(1, rect.width)),
+    y: (clientY - rect.top) * (canvas.height / Math.max(1, rect.height)),
+  };
+}
 
 // =============================
 // Obstacles (wedding props)
@@ -2368,6 +2743,7 @@ function spawnFire(x, y, dirX, dirY, baseSpeed){
 }
 
 function resetGameToPlaying(stageIndex){
+  resetCelebrationState();
   world.stageIndex = clamp(stageIndex ?? world.stageIndex ?? 0, 0, STAGES.length - 1);
   resetScoreFromStage(world.stageIndex);
   const cfg = getStageCfg(world.stageIndex);
@@ -2445,6 +2821,7 @@ function resetGameToPlaying(stageIndex){
   stageOneIntroScene.active = false;
   stageTwoIntroScene.active = false;
   stageThreeIntroScene.active = false;
+  world.celebrationMode = false;
   setHidden(endUI, true);
   setHidden(startUI, true);
   setHidden(stageUI, true);
@@ -2453,35 +2830,45 @@ function resetGameToPlaying(stageIndex){
   setJoystickHidden(false);
 }
 
-// Celebration: stage 2 (hall) look, Ofer and Tal dance only. No Mushu, no chaos, no joystick.
-// Uses same stageIndex=1 so edits to "screen 2" apply here too.
+// Celebration: stage 2 (hall) look, interactive bar, no timer, no joystick.
 function enterCelebration(){
+  resetCelebrationState();
   world.celebrationMode = true;
-  world.celebrationUntil = world.t + CELEBRATION_DURATION;
+  world.celebrationUntil = Number.POSITIVE_INFINITY;
   world.stageIndex = StageId.STAGE_2; // 1 = hall / הרחבת ריקודים
   world.chaosActive = false;
   world.brideRage = false;
+  world.endReason = 'ALL_CLEAR';
   bgCache = null;
   obstacles.length = 0;
   syncWorldToCanvasSize();
   const w = world.w || canvas.width;
   const h = world.h || canvas.height;
-  // Dance floor center (same as buildBackgroundCache stage 1)
-  const cx = w * 0.5;
-  const cy = h * 0.39;
-  ofer.x = cx - 42;
-  ofer.y = cy;
+  const oferAnchor = getCelebrationDanceAnchor(ofer, world.t);
+  const talAnchor = getCelebrationDanceAnchor(tal, world.t);
+  ofer.x = oferAnchor.x;
+  ofer.y = oferAnchor.y;
   ofer.vx = 0;
   ofer.vy = 0;
   tal.visible = true;
-  tal.x = cx + 42;
-  tal.y = cy;
+  tal.x = talAnchor.x;
+  tal.y = talAnchor.y;
   tal.vx = 0;
   tal.vy = 0;
+  mushu.x = -mushu.r * 4;
+  mushu.y = h * 0.82;
+  mushu.vx = 0;
+  mushu.vy = 0;
+  mushu.hasRings = false;
+  initCelebrationActorState(ofer);
+  initCelebrationActorState(tal);
   setJoystickHidden(true);
   resetJoystickVisual();
   setHidden(hudRow, true);
   setHidden(chaosEl, true);
+  setHidden(endUI, true);
+  setCelebrationUiVisible(true);
+  showOutcome('ALL_CLEAR');
   // Big confetti burst at start – random positions across the screen
   particles.length = 0;
   const pad = Math.min(w, h) * 0.08;
@@ -2498,6 +2885,7 @@ function enterEnd(reason){
   world.playEnabled = false;
   world.endReason = reason;
   world.celebrationMode = false;
+  resetCelebrationState();
   setHidden(endUI, false);
   setHidden(startUI, true);
   setHidden(stageUI, true);
@@ -2876,25 +3264,17 @@ function updateParticles(dt){
   }
 }
 
-// Dance animation: Ofer and Tal orbit on the dance floor (celebration only).
+// Interactive celebration: highlighted bottles invite taps; Ofer/Tal grab drinks and return.
 function updateCelebration(dt){
-  if (world.t >= world.celebrationUntil){
-    enterEnd('ALL_CLEAR');
-    return;
-  }
   const w = world.w || canvas.width;
   const h = world.h || canvas.height;
-  const cx = w * 0.5;
-  const cy = h * 0.39;
-  const radius = 48;
-  const speed = 0.75;
-  const t = world.t;
-  ofer.x = cx + Math.cos(t * speed) * radius;
-  ofer.y = cy + Math.sin(t * speed * 0.85) * (radius * 0.5);
-  tal.x = cx + Math.cos(t * speed + Math.PI) * radius;
-  tal.y = cy + Math.sin(t * speed * 0.85 + Math.PI) * (radius * 0.5);
-  // Ongoing fireworks every ~0.7s at random positions on screen
-  if (world.t - (world.celebrationLastConfettiAt ?? 0) >= 0.7){
+  const slots = getCelebrationBottleSlots();
+  updateCelebrationActor(ofer, getCelebrationDanceAnchor(ofer, world.t), slots, dt);
+  updateCelebrationActor(tal, getCelebrationDanceAnchor(tal, world.t), slots, dt);
+  updateCelebrationMushuTheft(dt, slots);
+
+  // Ongoing fireworks every ~1.1s at random positions on screen
+  if (world.t - (world.celebrationLastConfettiAt ?? 0) >= CELEBRATION_CONFETTI_INTERVAL_SEC){
     world.celebrationLastConfettiAt = world.t;
     const pad = Math.min(w, h) * 0.1;
     for (let i = 0; i < 3; i++){
@@ -3331,6 +3711,10 @@ function render(){
     }
   }
 
+  if (world.celebrationMode){
+    drawCelebrationBottles();
+  }
+
   // Ring aura around Mushu if he has rings (not in celebration)
   if (!world.celebrationMode && mushu.hasRings){
     const mushuVr = mushu.r * (mushu.renderScale ?? 1);
@@ -3385,7 +3769,10 @@ function render(){
     ctx.restore();
   }
 
-  if (!world.celebrationMode) drawBody(mushu);
+  if (!world.celebrationMode || celebration.mushuTheftState !== 'idle' || celebration.mushuCarryBottleId){
+    drawBody(mushu);
+    if (world.celebrationMode) drawCelebrationMushuBottle();
+  }
   if (tal.visible) drawBody(tal);
 
   // Trees drawn on top so they appear in front of characters
@@ -3504,6 +3891,7 @@ function render(){
 function getCelebrationDancePose(b, vr){
   if (!world?.celebrationMode) return null;
   if (b !== ofer && b !== tal) return null;
+  if (b.celebrationState && b.celebrationState !== 'dance') return null;
   const phase = (b === tal) ? Math.PI : 0;
   const groove = (world.t || 0) * 6.1 + phase;
   return {
@@ -4064,6 +4452,14 @@ function showOutcome(reason){
   const stageLabel = `שלב ${stageNum(world.stageIndex)} מתוך ${STAGES.length}`;
   endTitleEl.textContent = reason === 'ALL_CLEAR' ? o.title : `${o.title} • ${stageLabel}`;
   endTextEl.textContent = o.text;
+  if (celebrationResultTitleEl){
+    celebrationResultTitleEl.textContent = reason === 'ALL_CLEAR' ? `${o.title} • ${runScore.totalPoints} נק׳` : o.title;
+  }
+  if (celebrationResultSummaryEl){
+    celebrationResultSummaryEl.textContent = reason === 'ALL_CLEAR'
+      ? `${o.text} לחצו על הבקבוקים כדי לשלוח את עופר או את טל לדרינק קצר על הבר.`
+      : o.text;
+  }
   renderEndScore();
 }
 
@@ -4071,6 +4467,7 @@ function showOutcome(reason){
 // UI wiring
 // =============================
 function enterIdle(){
+  resetCelebrationState();
   state = GameState.IDLE;
   stageOneIntroScene.active = false;
   stageTwoIntroScene.active = false;
@@ -4216,6 +4613,20 @@ if (devCelebrationBtn) {
 if (devBackToStartBtn) {
   devBackToStartBtn.addEventListener('click', () => {
     enterIdle();
+  }, { passive: true });
+}
+
+if (celebrationResultBtn) {
+  celebrationResultBtn.addEventListener('click', () => {
+    setCelebrationResultDrawerOpen(!celebration.scoreDrawerOpen);
+  }, { passive: true });
+}
+
+if (celebrationRestartBtn) {
+  celebrationRestartBtn.addEventListener('click', async () => {
+    await ensureAudioUnlocked();
+    audio.sfx.start();
+    goToPlayingAndStartStage(StageId.STAGE_1, { skipStage1Intro: true });
   }, { passive: true });
 }
 
