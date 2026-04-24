@@ -1,5 +1,5 @@
 /* Wedding Chaos: Ofer vs Mushu (mobile-only canvas)
-   No external assets. Touch only. Portrait-ish.
+   Local project assets. Touch only. Portrait-ish.
 */
 'use strict';
 
@@ -155,6 +155,9 @@ const DEFAULT_CHAOS_EVENT_MAX_MS = 4000;
 const CHAOS_BREAK_SEC = 3;
 /** HUD chaos label: blink duration, then hide (matches CSS animation length). */
 const CHAOS_BANNER_VISIBLE_SEC = 3;
+/** After catching Mushu: quip duration and wait before next stage / celebration (same beat, world clock). */
+const POST_CATCH_QUIP_MS = 4200;
+const POST_CATCH_BEAT_SEC = POST_CATCH_QUIP_MS / 1000;
 
 // How to adjust difficulty:
 // - Increase PLAYER_SPEED to make catching easier.
@@ -172,7 +175,7 @@ const CELEBRATION_STOLEN_BOTTLE_RETURN_SEC = 4.2;
 const CELEBRATION_MUSHU_STEAL_SPEED = 500;
 const STAGE1_INTRO_SCENE_DURATION = 13;
 const STAGE2_INTRO_SCENE_DURATION = 16;
-const STAGE3_INTRO_SCENE_DURATION = 20;
+const STAGE3_INTRO_SCENE_DURATION = 18;
 
 // How to change text:
 // - Edit OUTCOMES at the bottom for different absurd endings.
@@ -396,6 +399,7 @@ let hasShownStage1HowTo = false;
 let pendingStageIndex = StageId.STAGE_1;
 let stageStartAt = 0;
 let countdownFromAt = 0;
+let celebrationStartAt = 0;
 let overlayMode = 'none'; // 'howto' | 'intro' | 'between' | 'none'
 
 function getStageCfg(i){
@@ -447,6 +451,7 @@ function startStageImmediately(stageIndex){
   pendingStageIndex = stageIndex;
   stageStartAt = 0;
   countdownFromAt = 0;
+  celebrationStartAt = 0;
   hideStageOverlay();
   resetGameToPlaying(stageIndex);
   world.playEnabled = true;
@@ -1060,10 +1065,10 @@ function updateStageThreeIntroScene(){
 
   const T1 = 5.5;
   const T2 = 8.6;
-  const T3 = 9.4;
-  const T4 = 15.48;
+  const T3 = 9.12;
+  const T4 = 13.45;
   const TEND = stageThreeIntroScene.durationSec;
-  const orbitLaps = 2.46;
+  const orbitLaps = 1.7;
 
   if (elapsed < T1){
     const k = elapsed / T1;
@@ -1109,7 +1114,7 @@ function updateStageThreeIntroScene(){
     mushu.hasRings = true;
   } else {
     const fleeT = clamp((elapsed - T4) / (TEND - T4), 0, 1);
-    const fleeEase = Math.pow(fleeT, 0.9);
+    const fleeEase = Math.pow(fleeT, 0.72);
     const angEnd = -Math.PI * 0.55 + orbitLaps * Math.PI * 2;
     const flee0x = pairCx + Math.cos(angEnd) * orbitRx;
     const flee0y = pairCy + Math.sin(angEnd) * orbitRy;
@@ -1142,7 +1147,7 @@ function updateStageThreeIntroScene(){
     } else if (captionIndex === 1){
       setCutsceneOverlay(`רגע… איפה הטבעת?`);
     } else if (captionIndex === 2){
-      setCutsceneOverlay(`מושו! עוד פעם??`);
+      setCutsceneOverlay(`מושו!`);
     }
   }
 
@@ -1160,6 +1165,7 @@ function scheduleStageStart(stageIndex, { showHowTo }){
   const totalDelay = showHowTo ? 5.0 : 3.0; // includes countdown
   stageStartAt = t + totalDelay;
   countdownFromAt = stageStartAt - 3.0;
+  celebrationStartAt = 0;
 
   showStageOverlay(cfg, showHowTo ? 'howto' : 'intro');
   world.playEnabled = false;
@@ -1179,6 +1185,7 @@ function scheduleNextStage(){
   const t = nowSec();
   stageStartAt = t + 3.0;
   countdownFromAt = stageStartAt - 3.0;
+  celebrationStartAt = 0;
   showStageOverlay(cfg, 'between');
   world.playEnabled = false;
   world.timeLeft = cfg.durationSec;
@@ -1861,6 +1868,35 @@ async function ensureAudioUnlocked(){
   await audio.resume();
 }
 
+const CELEBRATION_MUSIC_URL = 'assets/audio/celebration/more-than-you-know.mp3';
+let celebrationMusicEl = null;
+
+function getCelebrationMusicEl(){
+  if (!celebrationMusicEl){
+    celebrationMusicEl = new Audio(CELEBRATION_MUSIC_URL);
+    celebrationMusicEl.loop = true;
+    celebrationMusicEl.preload = 'auto';
+    celebrationMusicEl.volume = 0.52;
+  }
+  return celebrationMusicEl;
+}
+
+function stopCelebrationMusic(){
+  if (!celebrationMusicEl) return;
+  try {
+    celebrationMusicEl.pause();
+    celebrationMusicEl.currentTime = 0;
+  } catch (_e) {
+    /* ignore */
+  }
+}
+
+function startCelebrationMusic(){
+  const el = getCelebrationMusicEl();
+  el.currentTime = 0;
+  void el.play().catch(() => {});
+}
+
 // =============================
 // Game objects / simulation
 // =============================
@@ -1982,6 +2018,7 @@ function resetCelebrationState(){
   initCelebrationActorState(tal);
   setCelebrationResultDrawerOpen(false);
   setCelebrationUiVisible(false);
+  stopCelebrationMusic();
 }
 
 function clearCelebrationTheft(){
@@ -2768,6 +2805,7 @@ function resetGameToPlaying(stageIndex){
   world.fireTrailAcc = 0;
   world.caught = false;
   world.endReason = '';
+  celebrationStartAt = 0;
 
   // Start positions (portrait-ish)
   // Keep initial action closer to screen center (less "spawn at bottom / ceiling").
@@ -2878,6 +2916,7 @@ function enterCelebration(){
     spawnConfetti(55, rx, ry, 520);
   }
   world.celebrationLastConfettiAt = world.t;
+  void ensureAudioUnlocked().then(() => { startCelebrationMusic(); });
 }
 
 function enterEnd(reason){
@@ -3378,17 +3417,24 @@ function update(dt){
 
     // Stage progression: stage 1/2 auto-advance, stage 3 ends run.
     if (world.stageIndex < STAGES.length - 1){
-      // Freeze moment, then start next stage (no overlay / countdown).
+      // Freeze: hold quip on screen until POST_CATCH_BEAT_SEC, then intro / next stage.
       world.playEnabled = false;
+      celebrationStartAt = 0;
       pendingStageIndex = world.stageIndex + 1;
-      stageStartAt = world.t + 0.7;
+      stageStartAt = world.t + POST_CATCH_BEAT_SEC;
       countdownFromAt = 0;
       hideStageOverlay();
       const quipStage1 = `איזה תפיסה! (+${pts} נק׳).\nמושו: \"זה היה חימום\".`;
       const quipStage2 = `תפיסה הירואית (+${pts} נק׳).\nמושו: \"אוקיי אוקיי, הפעם ניצחתם… עד השלב הבא.\"`;
-      setQuip(world.stageIndex === 0 ? quipStage1 : quipStage2, 5200);
+      setQuip(world.stageIndex === 0 ? quipStage1 : quipStage2, POST_CATCH_QUIP_MS);
     } else {
-      enterCelebration();
+      world.playEnabled = false;
+      stageStartAt = 0;
+      countdownFromAt = 0;
+      celebrationStartAt = world.t + POST_CATCH_BEAT_SEC;
+      hideStageOverlay();
+      const quipStage3 = `סוגרים מעגל! (+${pts} נק׳).\nמושו: \"טוב, נתתם פה קרב אמיתי… אני הולך לנוח.\"`;
+      setQuip(quipStage3, POST_CATCH_QUIP_MS);
     }
     return;
   }
@@ -4362,11 +4408,18 @@ function loop(){
     else if (stageTwoIntroScene.active) updateStageTwoIntroScene(dt);
     else if (stageThreeIntroScene.active) updateStageThreeIntroScene(dt);
   } else if (state === GameState.PLAYING && !landscape){
+    // Delayed celebration after final catch (same beat as inter-stage quip).
+    if (!world.playEnabled && celebrationStartAt > 0 && world.t >= celebrationStartAt){
+      celebrationStartAt = 0;
+      world.playEnabled = true;
+      enterCelebration();
+    }
     // Stage start scheduling (uses world clock)
     if (!world.playEnabled && stageStartAt > 0 && world.t >= stageStartAt){
       const nextIdx = pendingStageIndex;
       stageStartAt = 0;
       countdownFromAt = 0;
+      celebrationStartAt = 0;
       hideStageOverlay();
       if (nextIdx === StageId.STAGE_2){
         startStageTwoIntroScene();
@@ -4486,6 +4539,7 @@ function enterIdle(){
   if (joystickEl) joystickEl.classList.add('joystick--onStart');
   resetJoystickVisual();
   setQuip('');
+  celebrationStartAt = 0;
   if (instructionsEl) instructionsEl.style.opacity = '0';
   chaosEl.textContent = '';
   chaosEl.classList.remove('chaosBanner--pulse');
