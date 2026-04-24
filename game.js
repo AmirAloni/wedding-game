@@ -303,6 +303,7 @@ const STAGES = [
     playerSpeed: 2600,
     mushuBaseSpeed: 520,
     chaosIntervalSec: 5.0,
+    chaosInitialDelaySec: 3,
     chaosEventMinMs: 3800,
     chaosEventMaxMs: 4200,
     chaosWeights: null,
@@ -328,6 +329,7 @@ const STAGES = [
     playerSpeed: 2400,
     mushuBaseSpeed: 580,
     chaosIntervalSec: 4.5,
+    chaosInitialDelaySec: 3,
     chaosEventMinMs: 4200,
     chaosEventMaxMs: 4800,
     chaosWeights: null,
@@ -525,6 +527,10 @@ const stageThreeIntroScene = {
   startedAt: 0,
   durationSec: STAGE3_INTRO_SCENE_DURATION,
   captionIndex: -1,
+  talAngry: false,
+  talFireSpitUntil: 0,
+  fireAcc: 0,
+  impactAcc: 0,
 };
 
 function getStageOneIntroRingAnchor(){
@@ -600,6 +606,8 @@ function startStageOneIntroScene(){
   stageOneIntroScene.ringAngle = 0.25;
 
   state = GameState.CUTSCENE;
+  stopStagePlayMusic();
+  void ensureAudioUnlocked().then(() => { startIntroSceneMusic(); });
   updateStageOneIntroScene();
   startLoopIfNeeded();
 }
@@ -781,6 +789,8 @@ function startStageTwoIntroScene(){
   stageTwoIntroScene.ringAngle = 0.15;
 
   state = GameState.CUTSCENE;
+  stopStagePlayMusic();
+  void ensureAudioUnlocked().then(() => { startIntroSceneMusic(); });
   updateStageTwoIntroScene();
   startLoopIfNeeded();
 }
@@ -994,6 +1004,9 @@ function startStageThreeIntroScene(){
   world.celebrationMode = false;
   world.playEnabled = false;
   world.endReason = '';
+  // Cutscene must not inherit Bride Rage from stage-2 gameplay (Tal sticker + radius).
+  clearChaosEffects();
+  tal.r = 20;
   world.stageIndex = StageId.STAGE_3;
   applyStageParams(getStageCfg(StageId.STAGE_3));
   bgCache = null;
@@ -1034,20 +1047,30 @@ function startStageThreeIntroScene(){
   stageThreeIntroScene.startedAt = now;
   stageThreeIntroScene.durationSec = STAGE3_INTRO_SCENE_DURATION;
   stageThreeIntroScene.captionIndex = -1;
+  stageThreeIntroScene.talAngry = false;
+  stageThreeIntroScene.talFireSpitUntil = 0;
+  stageThreeIntroScene.fireAcc = 0;
+  stageThreeIntroScene.impactAcc = 0;
 
   state = GameState.CUTSCENE;
+  stopStagePlayMusic();
+  void ensureAudioUnlocked().then(() => { startIntroSceneMusic(); });
   updateStageThreeIntroScene();
   startLoopIfNeeded();
 }
 
 function finishStageThreeIntroScene(){
   stageThreeIntroScene.active = false;
+  stageThreeIntroScene.talAngry = false;
+  stageThreeIntroScene.talFireSpitUntil = 0;
+  stageThreeIntroScene.fireAcc = 0;
+  stageThreeIntroScene.impactAcc = 0;
   hideCutsceneOverlay();
   setHidden(hudRow, false);
   startStageImmediately(StageId.STAGE_3);
 }
 
-function updateStageThreeIntroScene(){
+function updateStageThreeIntroScene(dt = world.dt || 0){
   if (!stageThreeIntroScene.active) return;
 
   const elapsed = clamp(world.t - stageThreeIntroScene.startedAt, 0, stageThreeIntroScene.durationSec);
@@ -1129,6 +1152,12 @@ function updateStageThreeIntroScene(){
     mushu.hasRings = true;
   }
 
+  if (stageThreeIntroScene.talAngry){
+    const flinch = 1;
+    ofer.x += Math.sin(world.t * 38) * 2.4 * flinch;
+    ofer.y += Math.cos(world.t * 31) * 1.5 * flinch;
+  }
+
   ofer.vx = 0;
   ofer.vy = 0;
   tal.vx = 0;
@@ -1147,9 +1176,47 @@ function updateStageThreeIntroScene(){
     } else if (captionIndex === 1){
       setCutsceneOverlay(`רגע… איפה הטבעת?`);
     } else if (captionIndex === 2){
+      stageThreeIntroScene.talAngry = true;
+      stageThreeIntroScene.talFireSpitUntil = stageThreeIntroScene.startedAt + stageThreeIntroScene.durationSec;
+      stageThreeIntroScene.fireAcc = 0;
+      stageThreeIntroScene.impactAcc = 0;
       setCutsceneOverlay(`מושו!`);
     }
   }
+
+  if (stageThreeIntroScene.talAngry){
+    const talVr = tal.r * (tal.renderScale ?? 1);
+    const mouthX = tal.x - talVr * 0.58;
+    const mouthY = tal.y - talVr * 0.18;
+    const hitX = ofer.x + ofer.r * 0.10;
+    const hitY = ofer.y - ofer.r * 0.42;
+    const dirX = hitX - mouthX;
+    const dirY = hitY - mouthY;
+    const dirLen = Math.hypot(dirX, dirY) || 1;
+    const beamDirX = dirX / dirLen;
+    const beamDirY = dirY / dirLen;
+    const beamEndX = hitX + beamDirX * Math.max(world.w * 0.42, 170);
+    const beamEndY = hitY + beamDirY * Math.max(world.h * 0.22, 90);
+    stageThreeIntroScene.fireAcc += dt * 128;
+    while (stageThreeIntroScene.fireAcc >= 1){
+      stageThreeIntroScene.fireAcc -= 1;
+      spawnFireJet(mouthX, mouthY, beamEndX, beamEndY, 1, 320, 560, 0.16);
+    }
+
+    stageThreeIntroScene.impactAcc += dt * 28;
+    while (stageThreeIntroScene.impactAcc >= 1){
+      stageThreeIntroScene.impactAcc -= 1;
+      spawnFire(
+        hitX + rand(-10, 10),
+        hitY + rand(-12, 12),
+        beamDirX + rand(-0.18, 0.08),
+        beamDirY + rand(-0.25, 0.12),
+        rand(80, 170)
+      );
+    }
+  }
+
+  updateParticles(dt);
 
   if (elapsed >= stageThreeIntroScene.durationSec){
     finishStageThreeIntroScene();
@@ -1198,6 +1265,7 @@ function applyStageParams(cfg){
     playerSpeed: cfg.playerSpeed ?? 2400,
     mushuBaseSpeed: cfg.mushuBaseSpeed ?? DEFAULT_MUSHU_BASE_SPEED,
     chaosIntervalSec: cfg.chaosIntervalSec ?? 5,
+    chaosInitialDelaySec: cfg.chaosInitialDelaySec,
     chaosEventMinMs: cfg.chaosEventMinMs ?? DEFAULT_CHAOS_EVENT_MIN_MS,
     chaosEventMaxMs: cfg.chaosEventMaxMs ?? DEFAULT_CHAOS_EVENT_MAX_MS,
     chaosWeights: cfg.chaosWeights,
@@ -1866,6 +1934,129 @@ function makeAudio(){
 async function ensureAudioUnlocked(){
   if (!audio) audio = makeAudio();
   await audio.resume();
+}
+
+const INTRO_SCENE_MUSIC_URL = 'assets/audio/gameplay/monkeys-spinning-monkeys.mp3';
+let introSceneMusicEl = null;
+
+function getIntroSceneMusicEl(){
+  if (!introSceneMusicEl){
+    introSceneMusicEl = new Audio(INTRO_SCENE_MUSIC_URL);
+    introSceneMusicEl.loop = true;
+    introSceneMusicEl.preload = 'auto';
+    introSceneMusicEl.volume = 0.48;
+  }
+  return introSceneMusicEl;
+}
+
+function stopIntroSceneMusic(){
+  if (!introSceneMusicEl) return;
+  try {
+    introSceneMusicEl.pause();
+    introSceneMusicEl.currentTime = 0;
+  } catch (_e) {
+    /* ignore */
+  }
+}
+
+function startIntroSceneMusic(){
+  const el = getIntroSceneMusicEl();
+  void el.play().catch(() => {});
+}
+
+const STAGE_PLAY_MUSIC_URL = 'assets/audio/gameplay/8bit.mp3';
+let stagePlayMusicEl = null;
+
+function getStagePlayMusicEl(){
+  if (!stagePlayMusicEl){
+    stagePlayMusicEl = new Audio(STAGE_PLAY_MUSIC_URL);
+    stagePlayMusicEl.loop = true;
+    stagePlayMusicEl.preload = 'auto';
+    stagePlayMusicEl.volume = 0.48;
+  }
+  return stagePlayMusicEl;
+}
+
+function stopStagePlayMusic(){
+  if (!stagePlayMusicEl) return;
+  try {
+    stagePlayMusicEl.pause();
+    stagePlayMusicEl.currentTime = 0;
+  } catch (_e) {
+    /* ignore */
+  }
+}
+
+function startStagePlayMusic(){
+  const el = getStagePlayMusicEl();
+  void el.play().catch(() => {});
+}
+
+function stopPreCelebrationRunMusic(){
+  stopIntroSceneMusic();
+  stopStagePlayMusic();
+  stopStage2BassChaosMusic();
+  stopBrideRageChaosMusic();
+}
+
+/** Short Timelapse clip (first 5s), layered on stage-2 8bit during "רעידת באס" chaos. */
+const STAGE_2_BASS_CHAOS_MUSIC_URL = 'assets/audio/chaos/timelapse-bass-5s.mp3';
+let stage2BassChaosMusicEl = null;
+
+function getStage2BassChaosMusicEl(){
+  if (!stage2BassChaosMusicEl){
+    stage2BassChaosMusicEl = new Audio(STAGE_2_BASS_CHAOS_MUSIC_URL);
+    stage2BassChaosMusicEl.loop = false;
+    stage2BassChaosMusicEl.preload = 'auto';
+    stage2BassChaosMusicEl.volume = 0.36;
+  }
+  return stage2BassChaosMusicEl;
+}
+
+function stopStage2BassChaosMusic(){
+  if (!stage2BassChaosMusicEl) return;
+  try {
+    stage2BassChaosMusicEl.pause();
+    stage2BassChaosMusicEl.currentTime = 0;
+  } catch (_e) {
+    /* ignore */
+  }
+}
+
+function startStage2BassChaosMusic(){
+  const el = getStage2BassChaosMusicEl();
+  el.currentTime = 0;
+  void el.play().catch(() => {});
+}
+
+/** Volatile Reaction 10s–15s (5s), layered during "הכלה זועמת" chaos on stages 2–3. */
+const BRIDE_RAGE_CHAOS_MUSIC_URL = 'assets/audio/chaos/volatile-bride-rage-5s.mp3';
+let brideRageChaosMusicEl = null;
+
+function getBrideRageChaosMusicEl(){
+  if (!brideRageChaosMusicEl){
+    brideRageChaosMusicEl = new Audio(BRIDE_RAGE_CHAOS_MUSIC_URL);
+    brideRageChaosMusicEl.loop = false;
+    brideRageChaosMusicEl.preload = 'auto';
+    brideRageChaosMusicEl.volume = 0.36;
+  }
+  return brideRageChaosMusicEl;
+}
+
+function stopBrideRageChaosMusic(){
+  if (!brideRageChaosMusicEl) return;
+  try {
+    brideRageChaosMusicEl.pause();
+    brideRageChaosMusicEl.currentTime = 0;
+  } catch (_e) {
+    /* ignore */
+  }
+}
+
+function startBrideRageChaosMusic(){
+  const el = getBrideRageChaosMusicEl();
+  el.currentTime = 0;
+  void el.play().catch(() => {});
 }
 
 const CELEBRATION_MUSIC_URL = 'assets/audio/celebration/more-than-you-know.mp3';
@@ -2779,6 +2970,29 @@ function spawnFire(x, y, dirX, dirY, baseSpeed){
   });
 }
 
+function spawnFireJet(x0, y0, x1, y1, amount, speedMin = 220, speedMax = 380, spread = 0.18){
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const d = Math.hypot(dx, dy) || 1;
+  const dirX = dx / d;
+  const dirY = dy / d;
+  const px = -dirY;
+  const py = dirX;
+  for (let i = 0; i < amount; i++){
+    const sway = rand(-spread, spread);
+    const burstX = dirX + px * sway;
+    const burstY = dirY + py * sway;
+    const burstD = Math.hypot(burstX, burstY) || 1;
+    spawnFire(
+      x0 + dirX * rand(0, 8),
+      y0 + dirY * rand(0, 8),
+      burstX / burstD,
+      burstY / burstD,
+      rand(speedMin, speedMax)
+    );
+  }
+}
+
 function resetGameToPlaying(stageIndex){
   resetCelebrationState();
   world.stageIndex = clamp(stageIndex ?? world.stageIndex ?? 0, 0, STAGES.length - 1);
@@ -2792,7 +3006,10 @@ function resetGameToPlaying(stageIndex){
   world.lastT = world.t;
   world.dt = 0;
   world.timeLeft = world.params?.durationSec ?? (cfg.durationSec ?? DEFAULT_GAME_DURATION);
-  world.chaosCountdown = world.params?.chaosIntervalSec ?? 5;
+  world.chaosCountdown =
+    world.params?.chaosInitialDelaySec ??
+    world.params?.chaosIntervalSec ??
+    5;
   world.chaosActive = false;
   world.chaosName = 'רגוע(בערך)';
   world.chaosUntil = 0;
@@ -2866,11 +3083,14 @@ function resetGameToPlaying(stageIndex){
   hideCutsceneOverlay();
   setHidden(hudRow, false);
   setJoystickHidden(false);
+  stopIntroSceneMusic();
+  void ensureAudioUnlocked().then(() => { startStagePlayMusic(); });
 }
 
 // Celebration: stage 2 (hall) look, interactive bar, no timer, no joystick.
 function enterCelebration(){
   resetCelebrationState();
+  stopPreCelebrationRunMusic();
   world.celebrationMode = true;
   world.celebrationUntil = Number.POSITIVE_INFINITY;
   world.stageIndex = StageId.STAGE_2; // 1 = hall / הרחבת ריקודים
@@ -2925,6 +3145,7 @@ function enterEnd(reason){
   world.endReason = reason;
   world.celebrationMode = false;
   resetCelebrationState();
+  stopPreCelebrationRunMusic();
   setHidden(endUI, false);
   setHidden(startUI, true);
   setHidden(stageUI, true);
@@ -2996,6 +3217,8 @@ function clearChaosEffects(){
   world.mushuBoost = 1;
   world.brideRage = false;
   world.shakeUntil = 0;
+  stopStage2BassChaosMusic();
+  stopBrideRageChaosMusic();
 }
 
 function startChaosEvent(name){
@@ -3027,6 +3250,9 @@ function startChaosEvent(name){
       break;
     case ChaosEvent.SCREEN_SHAKE:
       world.shakeUntil = t + dur;
+      if (world.stageIndex === StageId.STAGE_2){
+        void ensureAudioUnlocked().then(() => { startStage2BassChaosMusic(); });
+      }
       break;
     case ChaosEvent.BRIDE_RAGE:
       if (p.brideRageEnabled){
@@ -3038,6 +3264,9 @@ function startChaosEvent(name){
       // Tal becomes the rule engine: she injects wind + random bonks.
       tal.vx *= 1.25;
       tal.vy *= 1.1;
+      if (world.stageIndex === StageId.STAGE_2 || world.stageIndex === StageId.STAGE_3){
+        void ensureAudioUnlocked().then(() => { startBrideRageChaosMusic(); });
+      }
       break;
   }
 
@@ -3423,6 +3652,8 @@ function update(dt){
       pendingStageIndex = world.stageIndex + 1;
       stageStartAt = world.t + POST_CATCH_BEAT_SEC;
       countdownFromAt = 0;
+      clearChaosEffects();
+      tal.r = 20;
       hideStageOverlay();
       const quipStage1 = `איזה תפיסה! (+${pts} נק׳).\nמושו: \"זה היה חימום\".`;
       const quipStage2 = `תפיסה הירואית (+${pts} נק׳).\nמושו: \"אוקיי אוקיי, הפעם ניצחתם… עד השלב הבא.\"`;
@@ -4095,6 +4326,7 @@ function drawBody(b){
   const vr = b.r * (b.renderScale ?? 1);
   const stageIndex = (world?.stageIndex ?? 0);
   const talRageFx = (b === tal) && !!world?.brideRage && stageIndex === 2;
+  const talStage3IntroAngry = (b === tal) && !!stageThreeIntroScene?.active && !!stageThreeIntroScene.talAngry;
   const celebrationPose = getCelebrationDancePose(b, vr);
   // Shadow
   ctx.fillStyle = 'rgba(0,0,0,.28)';
@@ -4116,7 +4348,8 @@ function drawBody(b){
   else if (b === mushu) stickerImg = mushuStickerImg;
   else if (b === tal){
     // Swap Tal sticker during "Bride Rage" chaos.
-    const preferred = (world?.brideRage && stageIndex === 1) ? brideRageOneImg
+    const preferred = talStage3IntroAngry ? brideRageTwoImg
+      : (world?.brideRage && stageIndex === 1) ? brideRageOneImg
       : (world?.brideRage && stageIndex === 2) ? brideRageTwoImg
         : talStickerImg;
     stickerImg = imgReady(preferred) ? preferred : talStickerImg;
@@ -4521,6 +4754,7 @@ function showOutcome(reason){
 // =============================
 function enterIdle(){
   resetCelebrationState();
+  stopPreCelebrationRunMusic();
   state = GameState.IDLE;
   stageOneIntroScene.active = false;
   stageTwoIntroScene.active = false;
