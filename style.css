@@ -386,6 +386,15 @@ canvas#game{
   pointer-events: auto;
 }
 
+.celebrationBottomStack--hidden{
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+.celebrationBottomStack--hidden > *{
+  pointer-events: none;
+}
+
 .celebrationBottomStack > .celebrationResultDock,
 .celebrationBottomStack > #celebrationRestartBtn{
   width: min(280px, calc(100% - 28px));

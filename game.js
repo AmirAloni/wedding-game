@@ -4,7 +4,7 @@
 'use strict';
 
 // Set to true to show dev navigation buttons (stage/scene shortcuts + back-to-start).
-const DEV_MODE = false;
+const DEV_MODE = true;
 
 // Local sticker asset (display only)
 const oferStickerImg = new Image();
@@ -242,6 +242,7 @@ const celebrationResultTitleEl = document.getElementById('celebrationResultTitle
 const celebrationResultSummaryEl = document.getElementById('celebrationResultSummary');
 const celebrationScoreEl = document.getElementById('celebrationScore');
 const celebrationRestartBtn = document.getElementById('celebrationRestartBtn');
+const celebrationBottomStackEl = document.querySelector('.celebrationBottomStack');
 
 // On-screen joystick (movement)
 const joystickEl = document.getElementById('joystick');
@@ -2233,6 +2234,7 @@ function resetCelebrationState(){
   initCelebrationActorState(tal);
   setCelebrationResultDrawerOpen(false);
   setCelebrationUiVisible(false);
+  if (celebrationBottomStackEl) celebrationBottomStackEl.classList.remove('celebrationBottomStack--hidden');
   stopCelebrationMusic();
 }
 
@@ -3209,6 +3211,12 @@ function enterCelebration(){
   setHidden(chaosEl, true);
   setHidden(endUI, true);
   setCelebrationUiVisible(true);
+  if (celebrationBottomStackEl) {
+    celebrationBottomStackEl.classList.add('celebrationBottomStack--hidden');
+    setTimeout(() => {
+      celebrationBottomStackEl.classList.remove('celebrationBottomStack--hidden');
+    }, 10000);
+  }
   showOutcome('ALL_CLEAR');
   // Big confetti burst at start – random positions across the screen
   particles.length = 0;
