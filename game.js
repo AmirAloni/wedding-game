@@ -5018,6 +5018,28 @@ window.addEventListener('resize', () => {
 }, { passive: true });
 
 // =============================
+// Page visibility: pause music when tab is hidden, resume on return
+// =============================
+document.addEventListener('visibilitychange', () => {
+  const els = [introSceneMusicEl, stagePlayMusicEl, stage2BassChaosMusicEl, brideRageChaosMusicEl, celebrationMusicEl];
+  if (document.hidden){
+    for (const el of els){
+      if (el && !el.paused){
+        el._pausedByVisibility = true;
+        el.pause();
+      }
+    }
+  } else {
+    for (const el of els){
+      if (el && el._pausedByVisibility){
+        el._pausedByVisibility = false;
+        void el.play().catch(() => {});
+      }
+    }
+  }
+});
+
+// =============================
 // Boot
 // =============================
 enterIdle();
