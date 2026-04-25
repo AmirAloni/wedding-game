@@ -2518,11 +2518,7 @@ function drawCelebrationBottles(){
 
   // Flashing prompt above the featured bottle (only when free and no one is drinking it)
   const featuredSlot = slots.find((slot) => slot.featured && !slot.occupiedBy && !slot.blockedByTheft && !slot.hiddenByTheft);
-  if (featuredSlot && celebration.promptShownCount < 4){
-    if (featuredSlot.id !== celebration.promptLastId){
-      celebration.promptShownCount += 1;
-      celebration.promptLastId = featuredSlot.id;
-    }
+  if (featuredSlot){
     const blink = 1;
     const r = featuredSlot.renderRect;
     const text = 'לחצו!';
