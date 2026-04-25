@@ -4,7 +4,7 @@
 'use strict';
 
 // Set to true to show dev navigation buttons (stage/scene shortcuts + back-to-start).
-const DEV_MODE = true;
+const DEV_MODE = false;
 
 // Local sticker asset (display only)
 const oferStickerImg = new Image();
@@ -1952,6 +1952,30 @@ function makeAudio(){
 async function ensureAudioUnlocked(){
   if (!audio) audio = makeAudio();
   await audio.resume();
+}
+
+// iOS requires HTMLAudioElement.play() to be called directly inside a user gesture.
+// We prime every music element silently on the first touch so subsequent play() calls succeed.
+let _htmlAudioPrimed = false;
+async function primeHtmlAudioElements(){
+  if (_htmlAudioPrimed) return;
+  _htmlAudioPrimed = true;
+  const elements = [
+    getIntroSceneMusicEl(),
+    getStagePlayMusicEl(),
+    getStage2BassChaosMusicEl(),
+    getBrideRageChaosMusicEl(),
+    getCelebrationMusicEl(),
+  ];
+  for (const el of elements){
+    try {
+      el.muted = true;
+      await el.play();
+      el.pause();
+      el.currentTime = 0;
+      el.muted = false;
+    } catch (_e){ el.muted = false; }
+  }
 }
 
 const INTRO_SCENE_MUSIC_URL = 'assets/audio/gameplay/monkeys-spinning-monkeys.mp3';
@@ -4937,14 +4961,14 @@ function goToCelebration() {
 }
 
 if (startBtn) startBtn.addEventListener('click', async () => {
-  await ensureAudioUnlocked();
+  await Promise.all([ensureAudioUnlocked(), primeHtmlAudioElements()]);
   audio.sfx.start();
   goToPlayingAndStartStage(StageId.STAGE_1, { skipStage1Intro: true });
 }, { passive: true });
 
 if (introSceneBtn) {
   introSceneBtn.addEventListener('click', async () => {
-    await ensureAudioUnlocked();
+    await Promise.all([ensureAudioUnlocked(), primeHtmlAudioElements()]);
     audio.sfx.start();
     startStageOneIntroScene();
   }, { passive: true });
@@ -4952,7 +4976,7 @@ if (introSceneBtn) {
 
 if (introScene2Btn) {
   introScene2Btn.addEventListener('click', async () => {
-    await ensureAudioUnlocked();
+    await Promise.all([ensureAudioUnlocked(), primeHtmlAudioElements()]);
     audio.sfx.start();
     startStageTwoIntroScene();
   }, { passive: true });
@@ -4960,7 +4984,7 @@ if (introScene2Btn) {
 
 if (introScene3Btn) {
   introScene3Btn.addEventListener('click', async () => {
-    await ensureAudioUnlocked();
+    await Promise.all([ensureAudioUnlocked(), primeHtmlAudioElements()]);
     audio.sfx.start();
     startStageThreeIntroScene();
   }, { passive: true });
@@ -5000,14 +5024,14 @@ if (celebrationResultBtn) {
 
 if (celebrationRestartBtn) {
   celebrationRestartBtn.addEventListener('click', async () => {
-    await ensureAudioUnlocked();
+    await Promise.all([ensureAudioUnlocked(), primeHtmlAudioElements()]);
     audio.sfx.start();
     goToPlayingAndStartStage(StageId.STAGE_1, { skipStage1Intro: true });
   }, { passive: true });
 }
 
 restartBtn.addEventListener('click', async () => {
-  await ensureAudioUnlocked();
+  await Promise.all([ensureAudioUnlocked(), primeHtmlAudioElements()]);
   audio.sfx.start();
 
   // Retry same stage on TIME. After full clear, restart from stage 1.
