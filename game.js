@@ -3,6 +3,9 @@
 */
 'use strict';
 
+// Set to true to show dev navigation buttons (stage/scene shortcuts + back-to-start).
+const DEV_MODE = false;
+
 // Local sticker asset (display only)
 const oferStickerImg = new Image();
 oferStickerImg.decoding = 'async';
@@ -209,7 +212,14 @@ const devStage1Btn = document.getElementById('devStage1');
 const devStage2Btn = document.getElementById('devStage2');
 const devStage3Btn = document.getElementById('devStage3');
 const devCelebrationBtn = document.getElementById('devCelebration');
-const devBackToStartBtn = document.getElementById('devBackToStart');
+let devBackToStartBtn = document.getElementById('devBackToStart');
+
+if (!DEV_MODE){
+  const devNavEl = document.getElementById('devNav');
+  if (devNavEl) devNavEl.style.display = 'none';
+  if (devBackToStartBtn) devBackToStartBtn.style.display = 'none';
+  devBackToStartBtn = null;
+}
 
 const timerEl = document.getElementById('timer');
 const chaosEl = document.getElementById('chaos');
@@ -1796,15 +1806,14 @@ function renderDemo(){
   if (!w || !h) return;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const lawn = ctx.createRadialGradient(
-    w * 0.5, h * 0.2, Math.min(w, h) * 0.1,
-    w * 0.5, h * 0.5, Math.max(w, h) * 0.8
-  );
-  lawn.addColorStop(0, '#b9e56f');
-  lawn.addColorStop(0.5, '#6fd07f');
-  lawn.addColorStop(1, '#2f8d52');
-  ctx.fillStyle = lawn;
-  ctx.fillRect(0, 0, w, h);
+  if (levelThreeBgImg.naturalWidth){
+    const iw = levelThreeBgImg.naturalWidth, ih = levelThreeBgImg.naturalHeight;
+    const s = Math.max(w / iw, h / ih);
+    ctx.drawImage(levelThreeBgImg, (w - iw * s) / 2, (h - ih * s) / 2, iw * s, ih * s);
+  } else {
+    ctx.fillStyle = '#fffaf3';
+    ctx.fillRect(0, 0, w, h);
+  }
 
   if (demoCaught){
     ctx.font = '900 32px ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Arial';
@@ -2150,6 +2159,9 @@ const mushu = {
   hasRings: true,
   mood: 0,
   zigUntil: 0,
+  currentAngle: 0,
+  wanderAngle: 0,
+  wanderUntil: 0,
 };
 
 const tal = {
@@ -3387,7 +3399,8 @@ function boundsBounce(body, gainy){
   const minY = m + body.r;
   const maxY = h - m - body.r;
 
-  const bounce = gainy ? rand(0.92, 1.12) : rand(0.86, 1.06);
+  // Ofer gets energetic bounce; Mushu gets a damped bounce (wall repulsion handles steering).
+  const bounce = gainy ? rand(0.92, 1.12) : 1.0;
   const squish = rand(0.985, 1.015);
 
   if (body.x < minX){ body.x = minX; body.vx = Math.abs(body.vx) * bounce; body.vy *= squish; }
@@ -3426,86 +3439,83 @@ function steerOfer(dt){
 }
 
 function updateMushuAI(dt){
-  // Mushu: purely random movement in all stages – no reaction to Ofer.
+  // Steering model: fixed speed, limited turn rate → smooth organic curves.
+  // All stages + turbo share this path via world.mushuBoost.
   mushu.mood += dt;
   const t = world.t;
+  const w = world.w || canvas.width;
+  const h = world.h || canvas.height;
+  const m = ARENA_MARGIN;
 
-  // Periodically pick a new random wander direction (smooth but random)
+  const base = (world.params?.mushuBaseSpeed ?? DEFAULT_MUSHU_BASE_SPEED);
+  const speed = base * 0.72 * world.mushuBoost;
+
+  // --- Pick new target angle periodically ---
   if (!mushu.wanderUntil || t >= mushu.wanderUntil){
-    mushu.wanderUntil = t + rand(0.8, 2.2);
+    mushu.wanderUntil = t + rand(2.5, 4.5);
     mushu.wanderAngle = rand(0, Math.PI * 2);
   }
-  const wanderStrength = 0.65 + 0.25 * Math.sin(t * 2.1 + mushu.mood * 0.7);
-  let vx = Math.cos(mushu.wanderAngle) * wanderStrength;
-  let vy = Math.sin(mushu.wanderAngle) * wanderStrength;
 
-  // Zig windows: short random jitter
-  if (t > mushu.zigUntil && Math.random() < 0.008){
-    mushu.zigUntil = t + rand(0.15, 0.4);
-  }
-  if (t < mushu.zigUntil){
-    const zig = Math.sin((t * 13.0) + mushu.mood * 5) * 0.5;
-    const zag = Math.cos((t * 9.0) + mushu.mood * 3) * 0.4;
-    vx += zig;
-    vy += zag;
+  // --- Steer currentAngle toward target at a fixed turn rate (rad/s) ---
+  const turnRate = 1.1;
+  let da = mushu.wanderAngle - mushu.currentAngle;
+  while (da > Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+  const maxTurn = turnRate * dt;
+  mushu.currentAngle += Math.sign(da) * Math.min(Math.abs(da), maxTurn);
+
+  // --- Wall awareness: bias current angle away from nearby edges ---
+  const wallZone = Math.min(w, h) * 0.16;
+  let wallBiasX = 0, wallBiasY = 0;
+  if (mushu.x - m - mushu.r < wallZone) wallBiasX += 1;
+  if (w - m - mushu.r - mushu.x < wallZone) wallBiasX -= 1;
+  if (mushu.y - m - mushu.r < wallZone) wallBiasY += 1;
+  if (h - m - mushu.r - mushu.y < wallZone) wallBiasY -= 1;
+  if (wallBiasX !== 0 || wallBiasY !== 0){
+    const biasAngle = Math.atan2(wallBiasY, wallBiasX);
+    let bd = biasAngle - mushu.currentAngle;
+    while (bd > Math.PI) bd -= Math.PI * 2;
+    while (bd < -Math.PI) bd += Math.PI * 2;
+    mushu.currentAngle += Math.sign(bd) * Math.min(Math.abs(bd), turnRate * 2.5 * dt);
   }
 
-  // Avoid Tal during Bride Rage only (environmental, not Ofer-related)
-  if (world.brideRage){
-    let tx = mushu.x - tal.x;
-    let ty = mushu.y - tal.y;
-    const tm = Math.hypot(tx, ty) || 1;
-    tx /= tm; ty /= tm;
-    vx += tx * 1.6;
-    vy += ty * 1.6;
-  }
+  // --- Set velocity from current heading ---
+  mushu.vx = Math.cos(mushu.currentAngle) * speed;
+  mushu.vy = Math.sin(mushu.currentAngle) * speed;
 
-  // If Mushu is heading toward Ofer and close, avoid collision – steer to the other side
+  // --- Opening 5s of stages 2 & 3: maintain safe radius from Ofer ---
   const dx = ofer.x - mushu.x;
   const dy = ofer.y - mushu.y;
   const distToOfer = Math.hypot(dx, dy) || 1;
-  const towardOferX = dx / distToOfer;
-  const towardOferY = dy / distToOfer;
-  const rr = mushu.r + ofer.r;
-  const approachingOfer = (vx * towardOferX + vy * towardOferY) > 0.2;
-  if (approachingOfer && distToOfer < rr * 2.2){
-    vx -= towardOferX * 1.9;
-    vy -= towardOferY * 1.9;
+  const stageIdx = world.stageIndex ?? 0;
+  const stageDur = world.params?.durationSec ?? 30;
+  const elapsed = stageDur - world.timeLeft;
+  if ((stageIdx === 1 || stageIdx === 2) && elapsed < 5){
+    const fleeRadius = 180;
+    const fade = 1 - elapsed / 5;
+    if (distToOfer < fleeRadius){
+      // Override wander angle to point directly away from Ofer
+      mushu.wanderAngle = Math.atan2(-dy, -dx) + rand(-0.4, 0.4);
+      mushu.wanderUntil = t + 0.6;
+      // Extra flee impulse — stronger the closer Ofer is
+      const fleePush = (1 - distToOfer / fleeRadius) * speed * 2.2 * fade * dt;
+      mushu.vx -= (dx / distToOfer) * fleePush;
+      mushu.vy -= (dy / distToOfer) * fleePush;
+    }
+  } else if (distToOfer < 55){
+    // Normal gentle repel
+    const f = (1 - distToOfer / 55) * speed * 0.3 * dt;
+    mushu.vx -= (dx / distToOfer) * f;
+    mushu.vy -= (dy / distToOfer) * f;
   }
 
-  // Repel from Ofer when very close so Mushu doesn't get stuck (weak so catching is still possible)
-  const repelRadius = 38;
-  if (distToOfer > 0 && distToOfer < repelRadius) {
-    const nx = -towardOferX;
-    const ny = -towardOferY;
-    const strength = (1 - distToOfer / repelRadius) * 45;
-    mushu.vx += nx * strength;
-    mushu.vy += ny * strength;
-  }
-
-  // Normalize
-  const m2 = Math.hypot(vx, vy) || 1;
-  vx /= m2; vy /= m2;
-
-  // Small wobble so movement feels alive
-  const wob = Math.sin((t * 6.2) + mushu.mood * 2.7) * 0.12;
-  const wob2 = Math.cos((t * 5.1) + mushu.mood * 2.1) * 0.10;
-  vx += wob; vy += wob2;
-  const m3 = Math.hypot(vx, vy) || 1;
-  vx /= m3; vy /= m3;
-
-  // Base speed + chaos boost
-  const base = (world.params?.mushuBaseSpeed ?? DEFAULT_MUSHU_BASE_SPEED);
-  const speed = (base + 60 * Math.sin(mushu.mood * 2.1)) * world.mushuBoost;
-  mushu.vx += vx * speed * dt * rand(0.97, 1.03);
-  mushu.vy += vy * speed * dt * rand(0.97, 1.03);
-
-  // If he ever slows down too much, random kick so movement stays continuous
-  const v = Math.hypot(mushu.vx, mushu.vy);
-  if (v < 180){
-    const a = rand(0, Math.PI * 2);
-    mushu.vx += Math.cos(a) * 140;
-    mushu.vy += Math.sin(a) * 140;
+  // --- Avoid Tal during Bride Rage ---
+  if (world.brideRage){
+    const tx = mushu.x - tal.x;
+    const ty = mushu.y - tal.y;
+    const tm = Math.hypot(tx, ty) || 1;
+    mushu.vx += (tx / tm) * speed * 0.2 * dt;
+    mushu.vy += (ty / tm) * speed * 0.2 * dt;
   }
 }
 
@@ -3672,7 +3682,7 @@ function update(dt){
   }
   const isMushuTurbo = world.chaosActive && world.chaosName === ChaosEvent.MUSHU_BOOST;
   // Less drag so Mushu keeps speed and moves more continuously.
-  applyDrag(mushu, dt, isMushuTurbo ? 0.978 : 0.972);
+  // Drag not applied to Mushu — billiard AI normalizes speed each frame.
   boundsBounce(ofer, true);
   boundsBounce(mushu, false);
 
@@ -4922,7 +4932,7 @@ function goToCelebration() {
   startLoopIfNeeded();
 }
 
-startBtn.addEventListener('click', async () => {
+if (startBtn) startBtn.addEventListener('click', async () => {
   await ensureAudioUnlocked();
   audio.sfx.start();
   goToPlayingAndStartStage(StageId.STAGE_1, { skipStage1Intro: true });

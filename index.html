@@ -11,19 +11,14 @@
     <main id="app" aria-label="המשחק כאוס חתונה">
       <canvas id="game" aria-label="משטח המשחק"></canvas>
 
-      <!-- IDLE UI: title + explanations, then demo panel, then start button -->
+      <!-- IDLE UI: header → demo panel → footer -->
       <section id="startUI" class="overlay overlay--start" aria-label="מסך פתיחה">
-        <div class="startUI-background">
-          <div class="title">כאוס חתונה</div>
-          <div class="subtitle">מושו 🐕‍🦺 גנב את הטבעות 😱 תתפסו אותו לפני שתתחיל החופה!</div>
-          <div class="howto" aria-label="איך משחקים">
-            <div class="howtoTitle">איך משחקים</div>
-            <div class="howtoText">
-              מזיזים את הג׳ויסטיק כדי להזיז את עופר 🤵<br />
-              תופסים את מושו 🐕‍🦺 לפני שנגמר הזמן
-            </div>
-          </div>
-        </div>
+        <header class="startUI-header">
+          <div class="startUI-deco" aria-hidden="true">💍 🐕‍🦺 💍</div>
+          <h1 class="startUI-title">כאוס חתונה</h1>
+          <p class="startUI-tagline">תפסו את מושו לפני שתתחיל החופה!</p>
+        </header>
+
         <div id="startUI-demoPanel" class="startUI-demoPanel" aria-label="נסו את המשחק">
           <div id="startUI-timerWrap" class="startUI-timerWrap" aria-hidden="true"></div>
           <div id="startUI-demoViewport" class="startUI-demoViewport" aria-hidden="true">
@@ -34,6 +29,7 @@
           </div>
           <span class="startUI-finger" aria-hidden="true">👇</span>
         </div>
+
         <div class="startUI-footer">
           <div id="devNav" class="devNav" aria-label="ניווט לפיתוח">
             <span class="devNav-label">פיתוח:</span>
@@ -45,10 +41,7 @@
             <button type="button" id="introScene2Btn">סצנה לפני שלב 2</button>
             <button type="button" id="introScene3Btn">סצנה לפני שלב 3</button>
           </div>
-          <button id="startBtn" class="bigBtn" type="button">התחל</button>
-          <div class="tiny">
-            מובייל בלבד • מומלץ מצב לאורך
-          </div>
+          <div class="tiny">מובייל בלבד • מומלץ מצב לאורך</div>
         </div>
       </section>
 
