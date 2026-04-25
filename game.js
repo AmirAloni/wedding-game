@@ -525,6 +525,7 @@ function findFirstHallTable(){
 const stageThreeIntroScene = {
   active: false,
   startedAt: 0,
+  fireStartAt: 0,
   durationSec: STAGE3_INTRO_SCENE_DURATION,
   captionIndex: -1,
   talAngry: false,
@@ -1079,9 +1080,11 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
   const cx = w * 0.5;
   const yWalk0 = h * 0.88;
   const yWalk1 = h * 0.35;
-  const oferStopX = cx - 32;
-  const talStopX = cx + 32;
-  const pairCx = (oferStopX + talStopX) * 0.5;
+  const oferNormalX = cx - 38;
+  const talNormalX  = cx + 38;
+  const oferQuestionX = cx - 65;
+  const talQuestionX  = cx + 65;
+  const pairCx = cx;
   const pairCy = yWalk1 - 12;
   const orbitRx = Math.max(112, Math.min(w, h) * 0.24);
   const orbitRy = orbitRx * 0.52;
@@ -1095,19 +1098,20 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
 
   if (elapsed < T1){
     const k = elapsed / T1;
-    ofer.x = lerp(w * 0.43, oferStopX, k);
+    ofer.x = lerp(w * 0.43, oferNormalX, k);
     ofer.y = lerp(yWalk0, yWalk1, k) + Math.sin(elapsed * 5.5) * 2;
     tal.visible = true;
-    tal.x = lerp(w * 0.57, talStopX, k);
+    tal.x = lerp(w * 0.57, talNormalX, k);
     tal.y = lerp(yWalk0 - 10, yWalk1 - 6, k) + Math.sin(elapsed * 5.2 + 0.4) * 2;
     mushu.x = w * 0.5;
     mushu.y = h * 1.22;
     mushu.hasRings = false;
   } else if (elapsed < T2){
     const t = elapsed - T1;
-    ofer.x = oferStopX + Math.sin(t * 2.8) * 5;
+    const spread = clamp(t / 0.6, 0, 1);
+    ofer.x = lerp(oferNormalX, oferQuestionX, spread) + Math.sin(t * 2.8) * 5;
     ofer.y = yWalk1 + Math.sin(t * 3.1) * 2;
-    tal.x = talStopX + Math.cos(t * 2.6) * 5;
+    tal.x = lerp(talNormalX, talQuestionX, spread) + Math.cos(t * 2.6) * 5;
     tal.y = yWalk1 - 6 + Math.sin(t * 2.9) * 2;
     mushu.x = w * 0.5;
     mushu.y = h * 1.22;
@@ -1115,9 +1119,9 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
   } else if (elapsed < T3){
     const u = clamp((elapsed - T2) / (T3 - T2), 0, 1);
     const ease = 1 - Math.pow(1 - u, 1.85);
-    ofer.x = oferStopX + Math.sin((elapsed - T2) * 2.2) * 4;
+    ofer.x = oferQuestionX + Math.sin((elapsed - T2) * 2.2) * 4;
     ofer.y = yWalk1;
-    tal.x = talStopX + Math.cos((elapsed - T2) * 2.0) * 4;
+    tal.x = talQuestionX + Math.cos((elapsed - T2) * 2.0) * 4;
     tal.y = yWalk1 - 6;
     const ang0 = -Math.PI * 0.55;
     const x0 = pairCx + Math.cos(ang0) * orbitRx;
@@ -1128,9 +1132,9 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
   } else if (elapsed < T4){
     const orbitT = clamp((elapsed - T3) / (T4 - T3), 0, 1);
     const ang = -Math.PI * 0.55 + orbitT * Math.PI * 2 * orbitLaps;
-    ofer.x = oferStopX + Math.sin((elapsed - T2) * 1.9) * 3;
+    ofer.x = oferQuestionX + Math.sin((elapsed - T2) * 1.9) * 3;
     ofer.y = yWalk1;
-    tal.x = talStopX + Math.cos((elapsed - T2) * 1.85) * 3;
+    tal.x = talQuestionX + Math.cos((elapsed - T2) * 1.85) * 3;
     tal.y = yWalk1 - 6;
     mushu.x = pairCx + Math.cos(ang) * orbitRx;
     mushu.y = pairCy + Math.sin(ang) * orbitRy;
@@ -1141,9 +1145,9 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
     const angEnd = -Math.PI * 0.55 + orbitLaps * Math.PI * 2;
     const flee0x = pairCx + Math.cos(angEnd) * orbitRx;
     const flee0y = pairCy + Math.sin(angEnd) * orbitRy;
-    ofer.x = oferStopX + Math.sin((elapsed - T2) * 1.6) * 2.5;
+    ofer.x = oferQuestionX + Math.sin((elapsed - T2) * 1.6) * 2.5;
     ofer.y = yWalk1;
-    tal.x = talStopX + Math.cos((elapsed - T2) * 1.55) * 2.5;
+    tal.x = talQuestionX + Math.cos((elapsed - T2) * 1.55) * 2.5;
     tal.y = yWalk1 - 6;
     const fleeTargetX = lerp(flee0x, pairCx, fleeEase * 0.35);
     const fleeTargetY = h * 1.3;
@@ -1178,18 +1182,19 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
     } else if (captionIndex === 2){
       stageThreeIntroScene.talAngry = true;
       stageThreeIntroScene.talFireSpitUntil = stageThreeIntroScene.startedAt + stageThreeIntroScene.durationSec;
+      stageThreeIntroScene.fireStartAt = world.t + 1.0;
       stageThreeIntroScene.fireAcc = 0;
       stageThreeIntroScene.impactAcc = 0;
       setCutsceneOverlay(`מושו!`);
     }
   }
 
-  if (stageThreeIntroScene.talAngry){
+  if (stageThreeIntroScene.talAngry && world.t >= stageThreeIntroScene.fireStartAt){
     const talVr = tal.r * (tal.renderScale ?? 1);
     const mouthX = tal.x - talVr * 0.58;
-    const mouthY = tal.y - talVr * 0.18;
+    const mouthY = tal.y + talVr * 0.62;
     const hitX = ofer.x + ofer.r * 0.10;
-    const hitY = ofer.y - ofer.r * 0.42;
+    const hitY = ofer.y + ofer.r * 0.58;
     const dirX = hitX - mouthX;
     const dirY = hitY - mouthY;
     const dirLen = Math.hypot(dirX, dirY) || 1;
@@ -1197,10 +1202,13 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
     const beamDirY = dirY / dirLen;
     const beamEndX = hitX + beamDirX * Math.max(world.w * 0.42, 170);
     const beamEndY = hitY + beamDirY * Math.max(world.h * 0.22, 90);
-    stageThreeIntroScene.fireAcc += dt * 128;
+    stageThreeIntroScene.fireAcc += dt * 220;
     while (stageThreeIntroScene.fireAcc >= 1){
       stageThreeIntroScene.fireAcc -= 1;
-      spawnFireJet(mouthX, mouthY, beamEndX, beamEndY, 1, 320, 560, 0.16);
+      const t = Math.random();
+      const spawnX = mouthX + dirX * t;
+      const spawnY = mouthY + dirY * t;
+      spawnFire(spawnX, spawnY, beamDirX + rand(-0.12, 0.12), beamDirY + rand(-0.12, 0.12), rand(30, 80));
     }
 
     stageThreeIntroScene.impactAcc += dt * 28;
@@ -2173,6 +2181,8 @@ const celebration = {
   mushuExitX: 0,
   mushuExitY: 0,
   mushuCarryBottleId: null,
+  promptShownCount: 0,
+  promptLastId: null,
 };
 
 function getCelebrationBottleAsset(id){
@@ -2202,6 +2212,8 @@ function resetCelebrationState(){
   celebration.bottleAssignments.clear();
   celebration.clickStreak = 0;
   celebration.theftBottleId = null;
+  celebration.promptShownCount = 0;
+  celebration.promptLastId = null;
   celebration.theftReturnAt = 0;
   celebration.mushuTheftState = 'idle';
   celebration.mushuCarryBottleId = null;
@@ -2245,10 +2257,13 @@ function getCelebrationBottleSlots(){
   const w = world.w || canvas.width;
   const h = world.h || canvas.height;
   const count = CELEBRATION_BOTTLES.length;
-  const featuredIndex = Math.floor((world.t || 0) * 1.45) % count;
+  const slotDuration = 2.0;
+  const cyclePos = (world.t || 0) % (count * slotDuration);
+  const slotFraction = cyclePos % slotDuration;
+  const featuredIndex = slotFraction < 1.0 ? Math.floor(cyclePos / slotDuration) : -1;
   const usableLeft = bar.x + bar.w * 0.20;
   const usableRight = bar.x + bar.w * 0.80;
-  const shelfY = bar.y + bar.h * 0.44;
+  const shelfY = bar.y + bar.h * 0.75;
   // Stand just in front of the bar (small gap below bar hitbox — closer than before).
   const standBelowBar = clamp(h * 0.028, 12, 26);
   const actorY = clamp(bar.y + bar.h + standBelowBar, ARENA_MARGIN + 34, h - ARENA_MARGIN - 34);
@@ -2259,8 +2274,8 @@ function getCelebrationBottleSlots(){
     const phase = (world.t || 0) * 5.1 + index * 0.75;
     const featured = index === featuredIndex;
     const bob = featured ? (Math.sin(phase * 1.6) * 6 - 7) : (Math.sin(phase) * 1.8);
-    const maxW = clamp(bar.w * 0.135, 38, 82);
-    const maxH = clamp(bar.h * 1.04, 60, 130);
+    const maxW = clamp(bar.w * 0.20, 57, 123);
+    const maxH = clamp(bar.h * 1.56, 90, 195);
     const renderRect = isImgReady(bottle.img)
       ? imgContainDims(bottle.img, x, shelfY + bob, maxW, maxH, 'bottom')
       : { x: x - maxW / 2, y: shelfY + bob - maxH, w: maxW, h: maxH };
@@ -2445,17 +2460,76 @@ function drawCelebrationBottles(){
   for (const slot of slots){
     if (slot.hiddenByTheft) continue;
     const r = slot.renderRect;
+
+    // Tilt + move the bottle toward the drinker while they're drinking
+    let tiltAngle = 0;
+    let offsetX = 0;
+    let offsetY = 0;
+    const drinker = slot.occupiedBy;
+    if (drinker && drinker.celebrationState === 'drinking'){
+      const dir = drinker.x < slot.x ? -1 : 1;
+      const elapsed = CELEBRATION_DRINK_SEC - Math.max(0, (drinker.celebrationDrinkUntil || 0) - (world.t || 0));
+      const remaining = Math.max(0, (drinker.celebrationDrinkUntil || 0) - (world.t || 0));
+      const rampUp = clamp(elapsed / 0.3, 0, 1);
+      const rampDown = clamp(remaining / 0.25, 0, 1);
+      const t = rampUp * rampDown;
+      tiltAngle = dir * 1.2 * t;
+      // Move bottle from shelf down toward drinker's head
+      const targetX = drinker.x - r.w * 1.1;
+      const targetY = drinker.y + drinker.r * 0.5;
+      offsetX = (targetX - slot.x) * t;
+      offsetY = (targetY - slot.y) * t;
+    }
+
+    const pivotX = slot.x + offsetX;
+    const pivotY = slot.y + offsetY;
+
     ctx.save();
+    // Shadow (drawn before rotation so it stays flat)
     ctx.fillStyle = 'rgba(18,49,28,.14)';
     ctx.beginPath();
     ctx.ellipse(slot.x, slot.y + 8, Math.max(12, r.w * 0.36), Math.max(5, r.w * 0.14), 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // Rotate around bottle base (which may have moved toward the drinker)
+    ctx.translate(pivotX, pivotY);
+    ctx.rotate(tiltAngle);
+    ctx.translate(-pivotX, -pivotY);
+
     if (isImgReady(slot.img)){
-      ctx.drawImage(slot.img, r.x, r.y, r.w, r.h);
+      ctx.drawImage(slot.img, r.x + offsetX, r.y + offsetY, r.w, r.h);
     } else {
-      drawRoundedRect(ctx, r.x, r.y, r.w, r.h, 8, 'rgba(255,250,243,.68)', 'rgba(18,49,28,.14)');
+      drawRoundedRect(ctx, r.x + offsetX, r.y + offsetY, r.w, r.h, 8, 'rgba(255,250,243,.68)', 'rgba(18,49,28,.14)');
     }
+    ctx.restore();
+  }
+
+  // Flashing prompt above the featured bottle (only when free and no one is drinking it)
+  const featuredSlot = slots.find((slot) => slot.featured && !slot.occupiedBy && !slot.blockedByTheft && !slot.hiddenByTheft);
+  if (featuredSlot && celebration.promptShownCount < 4){
+    if (featuredSlot.id !== celebration.promptLastId){
+      celebration.promptShownCount += 1;
+      celebration.promptLastId = featuredSlot.id;
+    }
+    const blink = 1;
+    const r = featuredSlot.renderRect;
+    const text = 'לחצו!';
+    ctx.save();
+    ctx.font = '700 14px system-ui, -apple-system, Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const textW = ctx.measureText(text).width;
+    const padX = 11;
+    const padY = 6;
+    const boxW = textW + padX * 2;
+    const boxH = 14 + padY * 2;
+    const textX = featuredSlot.x;
+    const textY = r.y - 18;
+    ctx.globalAlpha = 0.2 + blink * 0.8;
+    drawRoundedRect(ctx, textX - boxW / 2, textY - boxH / 2, boxW, boxH, boxH / 2, 'rgba(255,220,240,0.94)', 'rgba(255,123,184,0.55)');
+    ctx.fillStyle = 'rgba(106,28,66,0.97)';
+    ctx.fillText(text, textX, textY);
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 }
@@ -3109,6 +3183,7 @@ function enterCelebration(){
   ofer.vx = 0;
   ofer.vy = 0;
   tal.visible = true;
+  tal.r = 20;
   tal.x = talAnchor.x;
   tal.y = talAnchor.y;
   tal.vx = 0;
@@ -3799,9 +3874,7 @@ function render(){
         const dr = (o.drawR ?? o.r);
         if (drawImgContain(ctx, whiteFlowersImg, dx, dy, dr * 3.4, dr * 2.9, 'center')) continue;
       } else if (o.type === 'woodStage'){
-        const cx = o.x + o.w / 2;
-        const cy = o.y + o.h / 2;
-        if (drawImgContain(ctx, woodStageImg, cx, cy, o.w * 1.35, o.h * 1.35, 'center')) continue;
+        continue; // drawn on top of characters below
       }
     }
 
@@ -3988,10 +4061,6 @@ function render(){
     }
   }
 
-  if (world.celebrationMode){
-    drawCelebrationBottles();
-  }
-
   // Ring aura around Mushu if he has rings (not in celebration)
   if (!world.celebrationMode && mushu.hasRings){
     const mushuVr = mushu.r * (mushu.renderScale ?? 1);
@@ -4051,6 +4120,7 @@ function render(){
     if (world.celebrationMode) drawCelebrationMushuBottle();
   }
   if (tal.visible) drawBody(tal);
+  if (world.celebrationMode) drawCelebrationBottles();
 
   // Trees drawn on top so they appear in front of characters
   for (let i = 0; i < obstacles.length; i++){
@@ -4075,6 +4145,10 @@ function render(){
       } else {
         drawImgContain(ctx, img, cx, by, maxW, maxH, 'bottom');
       }
+    } else if (stageIndex === 2 && o.type === 'woodStage'){
+      const cx = o.x + o.w / 2;
+      const cy = o.y + o.h / 2;
+      drawImgContain(ctx, woodStageImg, cx, cy, o.w * 1.35, o.h * 1.35, 'center');
     } else if (stageIndex === 2 && o.type === 'whiteTree'){
       const dx = (o.drawX ?? o.x);
       const dy = (o.drawY ?? o.y);
