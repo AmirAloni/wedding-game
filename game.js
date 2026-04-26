@@ -4,7 +4,7 @@
 'use strict';
 
 // Set to true to show dev navigation buttons (stage/scene shortcuts + back-to-start).
-const DEV_MODE = false;
+const DEV_MODE = true;
 
 // Local sticker asset (display only)
 const oferStickerImg = new Image();
@@ -2297,6 +2297,7 @@ const celebration = {
   mushuCarryBottleId: null,
   promptShownCount: 0,
   promptLastId: null,
+  hasInteracted: false,
 };
 
 function getCelebrationBottleAsset(id){
@@ -2331,6 +2332,7 @@ function resetCelebrationState(){
   celebration.theftReturnAt = 0;
   celebration.mushuTheftState = 'idle';
   celebration.mushuCarryBottleId = null;
+  celebration.hasInteracted = false;
   initCelebrationActorState(ofer);
   initCelebrationActorState(tal);
   setCelebrationResultDrawerOpen(false);
@@ -2484,6 +2486,7 @@ function startCelebrationBottleTheft(slot){
 
 function handleCelebrationBottleClick(slot){
   if (!slot || slot.occupiedBy || slot.blockedByTheft || slot.hiddenByTheft) return false;
+  celebration.hasInteracted = true;
   celebration.clickStreak += 1;
   if (celebration.clickStreak >= CELEBRATION_STEAL_EVERY_CLICKS && celebration.mushuTheftState === 'idle' && !celebration.theftBottleId){
     startCelebrationBottleTheft(slot);
@@ -2619,24 +2622,41 @@ function drawCelebrationBottles(){
     ctx.restore();
   }
 
-  // Flashing prompt above the featured bottle (only when free and no one is drinking it)
+  // Pulsing glow ring + bouncing tap prompt below the featured bottle (hidden after first interaction)
   const featuredSlot = slots.find((slot) => slot.featured && !slot.occupiedBy && !slot.blockedByTheft && !slot.hiddenByTheft);
-  if (featuredSlot){
-    const blink = 1;
+  if (featuredSlot && !celebration.hasInteracted){
     const r = featuredSlot.renderRect;
+    const t = nowSec();
+    const pulse = 0.5 + 0.5 * Math.sin(t * 4);
+
+    // Compute pill geometry first so the glow is centred on the pill
+    const bounce = Math.sin(t * 3.5) * 4;
     const text = 'לחצו!';
     ctx.save();
-    ctx.font = '700 14px system-ui, -apple-system, Arial';
+    ctx.font = '700 16px system-ui, -apple-system, Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const textW = ctx.measureText(text).width;
-    const padX = 11;
-    const padY = 6;
+    const padX = 13;
+    const padY = 7;
     const boxW = textW + padX * 2;
-    const boxH = 14 + padY * 2;
+    const boxH = 16 + padY * 2;
     const textX = featuredSlot.x;
-    const textY = r.y - 18;
-    ctx.globalAlpha = 0.2 + blink * 0.8;
+    const textY = r.y + r.h + 16 + bounce;
+
+    // Symmetric glow around the pill
+    const haloR = Math.max(boxW, boxH) * 1.0;
+    const grad = ctx.createRadialGradient(textX, textY, haloR * 0.1, textX, textY, haloR);
+    grad.addColorStop(0, `rgba(255,100,180,${(0.30 + pulse * 0.35).toFixed(2)})`);
+    grad.addColorStop(0.5, `rgba(255,100,180,${(0.18 + pulse * 0.22).toFixed(2)})`);
+    grad.addColorStop(1, 'rgba(255,100,180,0.0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(textX, textY, haloR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pill label
+    ctx.globalAlpha = 0.75 + pulse * 0.25;
     drawRoundedRect(ctx, textX - boxW / 2, textY - boxH / 2, boxW, boxH, boxH / 2, 'rgba(255,220,240,0.94)', 'rgba(255,123,184,0.55)');
     ctx.fillStyle = 'rgba(106,28,66,0.97)';
     ctx.fillText(text, textX, textY);
