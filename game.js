@@ -1687,6 +1687,22 @@ if (joystickBaseEl){
   joystickBaseEl.addEventListener('pointercancel', onJoystickPointerUp, { passive: true });
 }
 
+// Application Security Requirement: prime audio inside any first user gesture
+// to satisfy iOS/Chrome autoplay policy regardless of which element was touched.
+function primeAudioOnFirstGesture(){
+  void ensureAudioUnlocked();
+  void primeHtmlAudioElements();
+}
+const _primeOnce = (e) => {
+  primeAudioOnFirstGesture();
+  window.removeEventListener('pointerdown', _primeOnce, true);
+  window.removeEventListener('keydown', _primeOnce, true);
+  window.removeEventListener('touchstart', _primeOnce, true);
+};
+window.addEventListener('pointerdown', _primeOnce, { capture: true, passive: true });
+window.addEventListener('keydown', _primeOnce, { capture: true });
+window.addEventListener('touchstart', _primeOnce, { capture: true, passive: true });
+
 function onCelebrationCanvasPointerDown(e){
   if (!world.celebrationMode || state !== GameState.PLAYING) return;
   const pt = clientPointToCanvas(e.clientX, e.clientY);
@@ -2128,6 +2144,66 @@ function stopCelebrationMusic(){
     /* ignore */
   }
 }
+
+// Eagerly construct every music element at script load so the browser begins
+// downloading immediately (replaces <link rel=preload>, no Chrome 'as=audio' warning,
+// and the same Audio instance is reused later so no double-fetch).
+getIntroSceneMusicEl();
+getStagePlayMusicEl();
+getStage2BassChaosMusicEl();
+getBrideRageChaosMusicEl();
+getCelebrationMusicEl();
+
+// ── Audio preload with loading bar ───────────────
+// fetch() is not subject to iOS autoplay restrictions, so we use it (not
+// Audio.preload) to warm the HTTP cache before the first user gesture.
+// When play() is later called inside a gesture, the file is already cached
+// and resolves instantly — keeping us safely inside iOS's gesture window.
+(function initAudioPreload(){
+  const loadingUiEl  = document.getElementById('loadingUI');
+  const loadingBarEl = document.getElementById('loadingBar');
+  const loadingTrack = document.getElementById('loadingTrack');
+  const skipBtn      = document.getElementById('loadingSkipBtn');
+  if (!loadingUiEl) return;
+
+  let dismissed = false;
+  function dismiss(){
+    if (dismissed) return;
+    dismissed = true;
+    loadingUiEl.classList.add('loadingUI--done');
+    setTimeout(() => { if (loadingUiEl.parentNode) loadingUiEl.remove(); }, 500);
+  }
+
+  if (skipBtn) skipBtn.addEventListener('click', dismiss);
+  setTimeout(() => { if (!dismissed && skipBtn) skipBtn.classList.remove('isHidden'); }, 3000);
+
+  // Exact byte sizes used as weights for weighted progress display.
+  const assets = [
+    { url: INTRO_SCENE_MUSIC_URL,        bytes: 1532174 },
+    { url: STAGE_PLAY_MUSIC_URL,         bytes:  523339 },
+    { url: CELEBRATION_MUSIC_URL,        bytes:  577079 },
+    { url: STAGE_2_BASS_CHAOS_MUSIC_URL, bytes:   84278 },
+    { url: BRIDE_RAGE_CHAOS_MUSIC_URL,   bytes:   81850 },
+  ];
+  const totalBytes = assets.reduce((s, a) => s + a.bytes, 0);
+  let loadedBytes = 0;
+
+  function setProgress(ratio){
+    const pct = Math.round(ratio * 100);
+    if (loadingBarEl) loadingBarEl.style.width = pct + '%';
+    if (loadingTrack) loadingTrack.setAttribute('aria-valuenow', pct);
+    if (ratio >= 1) dismiss();
+  }
+
+  Promise.all(assets.map(async ({ url, bytes }) => {
+    try {
+      const res = await fetch(url);
+      await res.blob();
+    } catch(_){ /* network error — skip, game will still work */ }
+    loadedBytes += bytes;
+    setProgress(loadedBytes / totalBytes);
+  }));
+})();
 
 function startCelebrationMusic(){
   const el = getCelebrationMusicEl();

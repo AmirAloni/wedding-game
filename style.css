@@ -928,3 +928,77 @@ canvas#game{
 .joystick--onStart{
   z-index: 6;
 }
+
+/* ── Audio preload / loading screen ─────────────── */
+.loadingUI{
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--lawn0) 0%, var(--lawn1) 55%, var(--lawn2) 100%);
+  transition: opacity 0.45s ease;
+}
+.loadingUI--done{
+  opacity: 0;
+  pointer-events: none;
+}
+.loadingUI-box{
+  width: min(300px, 86vw);
+  background: var(--panel);
+  border-radius: 24px;
+  padding: 28px 24px 22px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.loadingUI-deco{
+  font-size: 20px;
+  letter-spacing: 8px;
+  opacity: 0.85;
+}
+.loadingUI-title{
+  font-size: clamp(28px, 8vw, 38px);
+  font-weight: 900;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.05;
+}
+.loadingUI-hint{
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0;
+}
+.loadingUI-track{
+  width: 100%;
+  height: 10px;
+  background: rgba(18,49,28,.12);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.loadingUI-fill{
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent2), var(--blush1));
+  border-radius: 99px;
+  transition: width 0.35s ease;
+}
+.loadingUI-skip{
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  background: none;
+  border: 1px solid rgba(18,49,28,.18);
+  border-radius: 99px;
+  padding: 5px 18px;
+  cursor: pointer;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+.loadingUI-skip:active{ opacity: 1; }
