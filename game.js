@@ -2195,14 +2195,14 @@ getCelebrationMusicEl();
     if (ratio >= 1) dismiss();
   }
 
-  Promise.all(assets.map(async ({ url, bytes }) => {
-    try {
-      const res = await fetch(url);
-      await res.blob();
-    } catch(_){ /* network error — skip, game will still work */ }
-    loadedBytes += bytes;
-    setProgress(loadedBytes / totalBytes);
-  }));
+  Promise.all(assets.map(({ url, bytes }) => new Promise(resolve => {
+    const audio = new Audio();
+    const done = () => { loadedBytes += bytes; setProgress(loadedBytes / totalBytes); resolve(); };
+    audio.addEventListener('canplaythrough', done, { once: true });
+    audio.addEventListener('error', done, { once: true });
+    audio.preload = 'auto';
+    audio.src = url;
+  })));
 })();
 
 function startCelebrationMusic(){
