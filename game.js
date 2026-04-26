@@ -1967,7 +1967,9 @@ async function primeHtmlAudioElements(){
     getBrideRageChaosMusicEl(),
     getCelebrationMusicEl(),
   ];
-  for (const el of elements){
+  // Application Security Requirement: parallel priming keeps all play() calls within
+  // the iOS user-gesture window; sequential awaits would expire it for later elements.
+  await Promise.all(elements.map(async el => {
     try {
       el.muted = true;
       await el.play();
@@ -1975,10 +1977,10 @@ async function primeHtmlAudioElements(){
       el.currentTime = 0;
       el.muted = false;
     } catch (_e){ el.muted = false; }
-  }
+  }));
 }
 
-const INTRO_SCENE_MUSIC_URL = 'assets/audio/gameplay/monkeys-spinning-monkeys.mp3';
+const INTRO_SCENE_MUSIC_URL = 'assets/audio/gameplay/monkeys-spinning-monkeys.m4a';
 let introSceneMusicEl = null;
 
 function getIntroSceneMusicEl(){
@@ -2006,7 +2008,7 @@ function startIntroSceneMusic(){
   void el.play().catch(() => {});
 }
 
-const STAGE_PLAY_MUSIC_URL = 'assets/audio/gameplay/8bit.mp3';
+const STAGE_PLAY_MUSIC_URL = 'assets/audio/gameplay/8bit.m4a';
 let stagePlayMusicEl = null;
 
 function getStagePlayMusicEl(){
@@ -2042,7 +2044,7 @@ function stopPreCelebrationRunMusic(){
 }
 
 /** Short Timelapse clip (first 5s), layered on stage-2 8bit during "רעידת באס" chaos. */
-const STAGE_2_BASS_CHAOS_MUSIC_URL = 'assets/audio/chaos/timelapse-bass-5s.mp3';
+const STAGE_2_BASS_CHAOS_MUSIC_URL = 'assets/audio/chaos/timelapse-bass-5s.m4a';
 let stage2BassChaosMusicEl = null;
 
 function getStage2BassChaosMusicEl(){
@@ -2072,7 +2074,7 @@ function startStage2BassChaosMusic(){
 }
 
 /** Volatile Reaction 10s–15s (5s), layered during "הכלה זועמת" chaos on stages 2–3. */
-const BRIDE_RAGE_CHAOS_MUSIC_URL = 'assets/audio/chaos/volatile-bride-rage-5s.mp3';
+const BRIDE_RAGE_CHAOS_MUSIC_URL = 'assets/audio/chaos/volatile-bride-rage-5s.m4a';
 let brideRageChaosMusicEl = null;
 
 function getBrideRageChaosMusicEl(){
@@ -2101,7 +2103,7 @@ function startBrideRageChaosMusic(){
   void el.play().catch(() => {});
 }
 
-const CELEBRATION_MUSIC_URL = 'assets/audio/celebration/more-than-you-know.mp3';
+const CELEBRATION_MUSIC_URL = 'assets/audio/celebration/more-than-you-know.m4a';
 let celebrationMusicEl = null;
 
 function getCelebrationMusicEl(){
