@@ -2163,7 +2163,6 @@ getCelebrationMusicEl();
   const loadingUiEl  = document.getElementById('loadingUI');
   const loadingBarEl = document.getElementById('loadingBar');
   const loadingTrack = document.getElementById('loadingTrack');
-  const skipBtn      = document.getElementById('loadingSkipBtn');
   if (!loadingUiEl) return;
 
   let dismissed = false;
@@ -2173,9 +2172,6 @@ getCelebrationMusicEl();
     loadingUiEl.classList.add('loadingUI--done');
     setTimeout(() => { if (loadingUiEl.parentNode) loadingUiEl.remove(); }, 500);
   }
-
-  if (skipBtn) skipBtn.addEventListener('click', dismiss);
-  setTimeout(() => { if (!dismissed && skipBtn) skipBtn.classList.remove('isHidden'); }, 3000);
 
   // Exact byte sizes used as weights for weighted progress display.
   const assets = [
