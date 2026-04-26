@@ -1656,6 +1656,9 @@ function onJoystickPointerDown(e){
   if (!allowed) return;
   if (!joystickBaseEl || !joystickKnobEl) return;
   if (joystick.active) return;
+  if (state === GameState.IDLE){
+    void Promise.all([ensureAudioUnlocked(), primeHtmlAudioElements()]);
+  }
 
   joystick.active = true;
   joystick.pointerId = e.pointerId;
