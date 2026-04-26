@@ -2159,16 +2159,17 @@ getCelebrationMusicEl();
 // Audio.preload) to warm the HTTP cache before the first user gesture.
 // When play() is later called inside a gesture, the file is already cached
 // and resolves instantly — keeping us safely inside iOS's gesture window.
-(function initAudioPreload(){
+function initAudioPreload(onReady){
   const loadingUiEl  = document.getElementById('loadingUI');
   const loadingBarEl = document.getElementById('loadingBar');
   const loadingTrack = document.getElementById('loadingTrack');
-  if (!loadingUiEl) return;
+  if (!loadingUiEl) { onReady?.(); return; }
 
   let dismissed = false;
   function dismiss(){
     if (dismissed) return;
     dismissed = true;
+    onReady?.();
     loadingUiEl.classList.add('loadingUI--done');
     setTimeout(() => { if (loadingUiEl.parentNode) loadingUiEl.remove(); }, 500);
   }
@@ -2199,7 +2200,7 @@ getCelebrationMusicEl();
     audio.preload = 'auto';
     audio.src = url;
   })));
-})();
+}
 
 function startCelebrationMusic(){
   const el = getCelebrationMusicEl();
@@ -5177,7 +5178,7 @@ document.addEventListener('visibilitychange', () => {
 // =============================
 // Boot
 // =============================
-enterIdle();
+initAudioPreload(enterIdle);
 
 // When ending, populate text right away.
 const _origEnterEnd = enterEnd;
