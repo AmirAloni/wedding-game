@@ -4,7 +4,7 @@
 'use strict';
 
 // Set to true to show dev navigation buttons (stage/scene shortcuts + back-to-start).
-const DEV_MODE = true;
+const DEV_MODE = false;
 
 // Local sticker asset (display only)
 const oferStickerImg = new Image();
