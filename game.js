@@ -2155,14 +2155,18 @@ getBrideRageChaosMusicEl();
 getCelebrationMusicEl();
 
 // ── Audio preload with loading bar ───────────────
-// fetch() is not subject to iOS autoplay restrictions, so we use it (not
-// Audio.preload) to warm the HTTP cache before the first user gesture.
-// When play() is later called inside a gesture, the file is already cached
-// and resolves instantly — keeping us safely inside iOS's gesture window.
+// We use fetch() (not Audio.preload) because iOS Safari ignores
+// audio.preload="auto" without a user gesture — canplaythrough/error never
+// fire, so the bar stays at 0% forever. fetch() is not bound by autoplay
+// restrictions, so it actually warms the HTTP cache and gives us real
+// per-byte progress via ReadableStream readers. Once cached, the audio
+// elements pick up the bytes from the HTTP cache when play() runs inside a
+// later user gesture.
 function initAudioPreload(onReady){
-  const loadingUiEl  = document.getElementById('loadingUI');
-  const loadingBarEl = document.getElementById('loadingBar');
-  const loadingTrack = document.getElementById('loadingTrack');
+  const loadingUiEl   = document.getElementById('loadingUI');
+  const loadingBarEl  = document.getElementById('loadingBar');
+  const loadingTrack  = document.getElementById('loadingTrack');
+  const loadingHintEl = loadingUiEl?.querySelector('.loadingUI-hint');
   if (!loadingUiEl) { onReady?.(); return; }
 
   let dismissed = false;
@@ -2184,22 +2188,104 @@ function initAudioPreload(onReady){
   ];
   const totalBytes = assets.reduce((s, a) => s + a.bytes, 0);
   let loadedBytes = 0;
+  const errors = [];
+  const cacheWarnings = [];
 
-  function setProgress(ratio){
-    const pct = Math.round(ratio * 100);
+  function renderProgress(){
+    const pct = Math.min(100, Math.round((loadedBytes / totalBytes) * 100));
     if (loadingBarEl) loadingBarEl.style.width = pct + '%';
     if (loadingTrack) loadingTrack.setAttribute('aria-valuenow', pct);
-    if (ratio >= 1) dismiss();
   }
 
-  Promise.all(assets.map(({ url, bytes }) => new Promise(resolve => {
-    const audio = new Audio();
-    const done = () => { loadedBytes += bytes; setProgress(loadedBytes / totalBytes); resolve(); };
-    audio.addEventListener('canplaythrough', done, { once: true });
-    audio.addEventListener('error', done, { once: true });
-    audio.preload = 'auto';
-    audio.src = url;
-  })));
+  const FETCH_TIMEOUT_MS = 30000;
+  const fileNameOf = (url) => url.split('/').pop();
+
+  // Detect Cache-Control directives that prevent the browser from re-using
+  // the bytes for a later <audio> request. Returns a short label describing
+  // the problem, or null if the headers look cache-friendly.
+  function detectCacheProblem(headers){
+    const raw = headers.get('cache-control');
+    if (!raw) return null; // No header → browser heuristic cache, usually fine for static assets.
+    const cc = raw.toLowerCase();
+    if (cc.includes('no-store')) return 'no-store';
+    if (cc.includes('no-cache')) return 'no-cache';
+    const m = cc.match(/max-age\s*=\s*(\d+)/);
+    if (m && parseInt(m[1], 10) === 0) return 'max-age=0';
+    return null;
+  }
+
+  async function preloadOne({ url, bytes }){
+    let creditedForFile = 0;
+    const credit = (delta) => {
+      if (delta <= 0) return;
+      creditedForFile += delta;
+      loadedBytes += delta;
+      renderProgress();
+    };
+
+    const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS) : null;
+
+    try {
+      const res = await fetch(url, { signal: controller?.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const cacheIssue = detectCacheProblem(res.headers);
+      if (cacheIssue) cacheWarnings.push({ url, reason: cacheIssue });
+
+      const headerLen = parseInt(res.headers.get('content-length') || '0', 10);
+      const totalForFile = headerLen > 0 ? headerLen : bytes;
+
+      if (res.body && typeof res.body.getReader === 'function') {
+        const reader = res.body.getReader();
+        let received = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          received += value.length;
+          const ratio = Math.min(1, received / totalForFile);
+          const target = Math.round(ratio * bytes);
+          credit(target - creditedForFile);
+        }
+      } else {
+        await res.arrayBuffer();
+      }
+    } catch (err) {
+      const isTimeout = err && (err.name === 'AbortError' || err.code === 20);
+      const reason = isTimeout
+        ? 'תם הזמן'
+        : (err?.message ? String(err.message) : 'שגיאת רשת');
+      errors.push({ url, reason });
+    } finally {
+      if (timer) clearTimeout(timer);
+      // Always finalize the file's weight so the bar can reach 100%
+      // even if the fetch failed or content-length lied.
+      credit(bytes - creditedForFile);
+    }
+  }
+
+  Promise.all(assets.map(preloadOne)).then(() => {
+    const hasErrors   = errors.length > 0;
+    const hasWarnings = cacheWarnings.length > 0;
+
+    if (!hasErrors && !hasWarnings) { dismiss(); return; }
+    if (!loadingHintEl)             { dismiss(); return; }
+
+    const lines = [];
+    if (hasErrors) {
+      const list = errors.map(e => `${fileNameOf(e.url)} (${e.reason})`).join(', ');
+      lines.push('בעיה בטעינת אודיו: ' + list + '. ממשיכים בכל זאת...');
+    }
+    if (hasWarnings) {
+      const list = cacheWarnings.map(w => `${fileNameOf(w.url)}: ${w.reason}`).join(', ');
+      lines.push('אזהרת cache (השרת מסמן את הקבצים כלא-נשמרים — האודיו עלול להיטען מחדש בזמן ההשמעה): ' + list);
+    }
+
+    // textContent prevents any HTML interpretation of header-derived strings.
+    loadingHintEl.textContent = lines.join('\n');
+    loadingHintEl.classList.add('loadingUI-hint--error');
+    setTimeout(dismiss, hasErrors ? 3000 : 4500);
+  });
 }
 
 function startCelebrationMusic(){
