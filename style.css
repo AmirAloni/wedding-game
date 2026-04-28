@@ -314,10 +314,17 @@ canvas#game{
 }
 
 .demoHint--inside{
-  font-size: 12px;
-  font-weight: 800;
-  color: rgba(18,49,28,.8);
-  text-shadow: 0 1px 3px rgba(255,250,243,.72);
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--ink);
+  background: rgba(255,250,243,.95);
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(18,49,28,.14);
+  box-shadow: 0 4px 18px rgba(18,49,28,.28);
+  backdrop-filter: blur(6px);
+  text-shadow: none;
+  letter-spacing: .01em;
 }
 
 .overlay--center .panel,

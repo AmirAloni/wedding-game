@@ -4,7 +4,7 @@
 'use strict';
 
 // Set to true to show dev navigation buttons (stage/scene shortcuts + back-to-start).
-const DEV_MODE = false;
+const DEV_MODE = true;
 
 // Local sticker asset (display only)
 const oferStickerImg = new Image();
@@ -195,6 +195,8 @@ let bgCache = null;
 const startUI = document.getElementById('startUI');
 const startUIDemoPanel = document.getElementById('startUI-demoPanel');
 const startUIDemoViewport = document.getElementById('startUI-demoViewport');
+const demoPanelHintEl = document.getElementById('demoPanelHint');
+const startUIFingerEl = document.getElementById('startUIFinger');
 const startUITimerWrap = document.getElementById('startUI-timerWrap');
 const hudRow = document.getElementById('hudRow');
 const endUI = document.getElementById('endUI');
@@ -336,7 +338,7 @@ const STAGES = [
     place: 'בחופה',
     punch: 'כולם צועקים \"רק עוד תמונה\" והוא בורח.',
     intro: 'זה השלב שבו מושו נהיה קטן-חמוד-חסין-לחוקים.',
-    durationSec: 30,
+    durationSec: 35,
     playerSpeed: 2400,
     mushuBaseSpeed: 580,
     chaosIntervalSec: 4.5,
@@ -344,7 +346,7 @@ const STAGES = [
     chaosEventMinMs: 4200,
     chaosEventMaxMs: 4800,
     chaosWeights: null,
-    mushuBoostRange: [2.8, 3.6],
+    mushuBoostRange: [1.8, 2.3],
     shakeIntensity: 0.6,
     brideRageEnabled: true,
     brideRageDurFactor: 1.05,
@@ -715,7 +717,7 @@ function updateStageOneIntroScene(){
     } else if (captionIndex === 3){
       setCutsceneOverlay('חטיפה!');
     } else {
-      setCutsceneOverlay('יאללה, כדאי לתפוס את מושו לפני שטל תדע מזה.');
+      setCutsceneOverlay('יאללה, כדאי לתפוס את מושו לפני שטל תדע.');
     }
   }
 
@@ -1193,7 +1195,7 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
     } else if (captionIndex === 2){
       stageThreeIntroScene.talAngry = true;
       stageThreeIntroScene.talFireSpitUntil = stageThreeIntroScene.startedAt + stageThreeIntroScene.durationSec;
-      stageThreeIntroScene.fireStartAt = world.t + 1.0;
+      stageThreeIntroScene.fireStartAt = world.t;
       stageThreeIntroScene.fireAcc = 0;
       stageThreeIntroScene.impactAcc = 0;
       setCutsceneOverlay(`מושו!`);
@@ -1211,25 +1213,40 @@ function updateStageThreeIntroScene(dt = world.dt || 0){
     const dirLen = Math.hypot(dirX, dirY) || 1;
     const beamDirX = dirX / dirLen;
     const beamDirY = dirY / dirLen;
+    const perpX = -beamDirY;
+    const perpY = beamDirX;
     const beamEndX = hitX + beamDirX * Math.max(world.w * 0.42, 170);
     const beamEndY = hitY + beamDirY * Math.max(world.h * 0.22, 90);
-    stageThreeIntroScene.fireAcc += dt * 220;
+    // Cone shape: narrow at Tal's mouth, wider toward Ofer.
+    const coneStartHalfWidth = Math.max(talVr * 0.05, 2);
+    const coneEndHalfWidth = Math.max(ofer.r * 0.38, 22);
+    stageThreeIntroScene.fireAcc += dt * 320;
     while (stageThreeIntroScene.fireAcc >= 1){
       stageThreeIntroScene.fireAcc -= 1;
       const t = Math.random();
-      const spawnX = mouthX + dirX * t;
-      const spawnY = mouthY + dirY * t;
-      spawnFire(spawnX, spawnY, beamDirX + rand(-0.12, 0.12), beamDirY + rand(-0.12, 0.12), rand(30, 80));
+      const halfWidth = coneStartHalfWidth + (coneEndHalfWidth - coneStartHalfWidth) * t;
+      const sway = rand(-1, 1) * halfWidth;
+      const spawnX = mouthX + dirX * t + perpX * sway;
+      const spawnY = mouthY + dirY * t + perpY * sway;
+      const swayDir = rand(-0.16, 0.16) * (0.25 + t * 0.85);
+      spawnFire(
+        spawnX,
+        spawnY,
+        beamDirX + perpX * swayDir,
+        beamDirY + perpY * swayDir,
+        rand(30, 80)
+      );
     }
 
-    stageThreeIntroScene.impactAcc += dt * 28;
+    stageThreeIntroScene.impactAcc += dt * 36;
     while (stageThreeIntroScene.impactAcc >= 1){
       stageThreeIntroScene.impactAcc -= 1;
+      const splashSway = rand(-1, 1) * coneEndHalfWidth;
       spawnFire(
-        hitX + rand(-10, 10),
-        hitY + rand(-12, 12),
-        beamDirX + rand(-0.18, 0.08),
-        beamDirY + rand(-0.25, 0.12),
+        hitX + perpX * splashSway + rand(-6, 6),
+        hitY + perpY * splashSway + rand(-8, 8),
+        beamDirX + rand(-0.22, 0.10),
+        beamDirY + rand(-0.30, 0.14),
         rand(80, 170)
       );
     }
@@ -1652,7 +1669,8 @@ function updateJoystickFromClientPoint(clientX, clientY){
 }
 
 function onJoystickPointerDown(e){
-  const allowed = state === GameState.PLAYING && world.playEnabled || state === GameState.IDLE;
+  const idleAllowed = state === GameState.IDLE && demoPhase === 'CATCH_MUSHU';
+  const allowed = (state === GameState.PLAYING && world.playEnabled) || idleAllowed;
   if (!allowed) return;
   if (!joystickBaseEl || !joystickKnobEl) return;
   if (joystick.active) return;
@@ -1725,12 +1743,17 @@ let demoTimerStarted = false;
 let demoTimeLeft = 0;
 const DEMO_CATCH_SHOW_SEC = 1.2; /* celebration then go straight to stage 1 (no countdown) */
 
+// Tutorial phases: first auto-animate the joystick so the user sees how it works,
+// then switch to interactive Mushu-catch.
+let demoPhase = 'JOYSTICK_DEMO'; // 'JOYSTICK_DEMO' | 'CATCH_MUSHU'
+let demoPhaseElapsed = 0;
+const DEMO_JOYSTICK_PHASE_SEC = 6.0;
+
 function initDemoPositions(){
   const w = canvas.width || 400;
   const h = canvas.height || 700;
-  const m = 40;
   demoOfer.x = w * 0.5;
-  demoOfer.y = h * 0.78;
+  demoOfer.y = h * 0.62;
   demoOfer.vx = 0;
   demoOfer.vy = 0;
   demoMushu.x = w * 0.5;
@@ -1740,6 +1763,8 @@ function initDemoPositions(){
   demoCaught = false;
   demoResetAt = 0;
   demoTimerStarted = false;
+  demoPhase = 'JOYSTICK_DEMO';
+  demoPhaseElapsed = 0;
 }
 
 function startGameFromDemoCatch(){
@@ -1749,35 +1774,93 @@ function startGameFromDemoCatch(){
 
 function updateDemo(dt){
   if (demoCaught){
-    if (nowSec() >= demoResetAt) {
-      startGameFromDemoCatch();
+    if (nowSec() >= demoResetAt) startGameFromDemoCatch();
+    return;
+  }
+
+  const cw = canvas.width || 400;
+  const ch = canvas.height || 700;
+
+  // ── Phase 1: auto-animate joystick to show how Ofer moves ──
+  if (demoPhase === 'JOYSTICK_DEMO'){
+    demoPhaseElapsed += dt;
+
+    // Trace a smooth figure-8 / Lissajous path so the demo covers all directions
+    const t = demoPhaseElapsed;
+    const simX = Math.sin(t * 1.6) * 0.82;
+    const simY = Math.sin(t * 0.9) * 0.78;
+
+    // Animate the joystick knob and the finger hint together
+    const MAX_KNOB_OFFSET = 44;
+    const ox = (simX * MAX_KNOB_OFFSET).toFixed(1);
+    const oy = (simY * MAX_KNOB_OFFSET).toFixed(1);
+    if (joystickKnobEl){
+      joystickKnobEl.style.transition = 'none';
+      joystickKnobEl.style.transform = `translate(-50%, -50%) translate(${ox}px, ${oy}px)`;
+    }
+    if (startUIFingerEl){
+      startUIFingerEl.style.animation = 'none';
+      startUIFingerEl.style.transform = `translateX(calc(-50% + ${ox}px)) translateY(${oy}px)`;
+    }
+
+    // Drive Ofer from simulated stick
+    const sm = Math.hypot(simX, simY);
+    const dead = 0.08;
+    if (sm > dead){
+      const strength = clamp((sm - dead) / (1 - dead), 0, 1);
+      const accel = 2200;
+      demoOfer.vx += (simX / sm) * accel * strength * dt;
+      demoOfer.vy += (simY / sm) * accel * strength * dt;
+    }
+    demoOfer.vx *= 0.88;
+    demoOfer.vy *= 0.88;
+    demoOfer.x += demoOfer.vx * dt;
+    demoOfer.y += demoOfer.vy * dt;
+    const am = ARENA_MARGIN;
+    demoOfer.x = clamp(demoOfer.x, am + demoOfer.r, cw - am - demoOfer.r);
+    demoOfer.y = clamp(demoOfer.y, am + demoOfer.r, ch - am - demoOfer.r);
+
+    if (demoPhaseElapsed >= DEMO_JOYSTICK_PHASE_SEC){
+      // Transition → catch phase
+      demoPhase = 'CATCH_MUSHU';
+      demoPhaseElapsed = 0;
+      resetJoystickVisual();
+      // Restore finger to its normal bouncing animation
+      if (startUIFingerEl){
+        startUIFingerEl.style.animation = '';
+        startUIFingerEl.style.transform = '';
+      }
+      // Update hint text
+      if (demoPanelHintEl) demoPanelHintEl.textContent = 'עכשיו תפסו את מושו! 🐶';
+      // Reset Ofer to center so the user starts from a fair position
+      demoOfer.x = cw * 0.5;
+      demoOfer.y = ch * 0.72;
+      demoOfer.vx = 0;
+      demoOfer.vy = 0;
+      // Start the countdown timer now that real play begins
+      demoTimerStarted = true;
     }
     return;
   }
 
-  // Start demo timer on first joystick touch
-  if (joystick.active && !demoTimerStarted) {
-    demoTimerStarted = true;
-  }
-  if (demoTimerStarted) {
+  // ── Phase 2: user controls joystick, catch Mushu ──
+  if (demoTimerStarted){
     demoTimeLeft = clamp(demoTimeLeft - dt, 0, 999);
     if (timerEl) timerEl.textContent = demoTimeLeft.toFixed(1);
   }
 
-  // Steer demo Ofer from joystick (same logic as steerOfer)
   if (joystick.active){
     let x = joystick.x;
     let y = joystick.y;
-    const m = Math.hypot(x, y);
+    const jm = Math.hypot(x, y);
     const dead = 0.12;
-    if (m > dead){
-      const strength = clamp((m - dead) / (1 - dead), 0, 1);
-      const inv = 1 / (m || 1);
+    if (jm > dead){
+      const strength = clamp((jm - dead) / (1 - dead), 0, 1);
+      const inv = 1 / (jm || 1);
       x *= inv;
       y *= inv;
-      const accel = 2000;
-      demoOfer.vx += x * accel * strength * dt;
-      demoOfer.vy += y * accel * strength * dt;
+      demoOfer.vx += x * 2000 * strength * dt;
+      demoOfer.vy += y * 2000 * strength * dt;
     }
   }
 
@@ -1786,32 +1869,28 @@ function updateDemo(dt){
   demoOfer.x += demoOfer.vx * dt;
   demoOfer.y += demoOfer.vy * dt;
 
-  // Mushu wanders slowly; repel from Ofer when close so he doesn't get stuck
+  // Mushu wanders; repel from Ofer so he doesn't get pinned
   const dx = demoMushu.x - demoOfer.x;
   const dy = demoMushu.y - demoOfer.y;
   const d2 = dist2(demoOfer.x, demoOfer.y, demoMushu.x, demoMushu.y);
   const repelRadius = 38;
-  if (d2 > 0 && d2 < repelRadius * repelRadius) {
+  if (d2 > 0 && d2 < repelRadius * repelRadius){
     const d = Math.sqrt(d2);
-    const nx = dx / d;
-    const ny = dy / d;
     const strength = (1 - d / repelRadius) * 45;
-    demoMushu.vx += nx * strength;
-    demoMushu.vy += ny * strength;
+    demoMushu.vx += (dx / d) * strength;
+    demoMushu.vy += (dy / d) * strength;
   }
   demoMushu.x += demoMushu.vx * dt;
   demoMushu.y += demoMushu.vy * dt;
-  const w = canvas.width || 400;
-  const h = canvas.height || 700;
   const margin = 50;
-  if (demoMushu.x < margin || demoMushu.x > w - margin) demoMushu.vx *= -1;
-  if (demoMushu.y < margin || demoMushu.y > h - margin) demoMushu.vy *= -1;
-  demoMushu.x = clamp(demoMushu.x, margin, w - margin);
-  demoMushu.y = clamp(demoMushu.y, margin, h - margin);
+  if (demoMushu.x < margin || demoMushu.x > cw - margin) demoMushu.vx *= -1;
+  if (demoMushu.y < margin || demoMushu.y > ch - margin) demoMushu.vy *= -1;
+  demoMushu.x = clamp(demoMushu.x, margin, cw - margin);
+  demoMushu.y = clamp(demoMushu.y, margin, ch - margin);
 
-  const m = ARENA_MARGIN;
-  demoOfer.x = clamp(demoOfer.x, m + demoOfer.r, w - m - demoOfer.r);
-  demoOfer.y = clamp(demoOfer.y, m + demoOfer.r, h - m - demoOfer.r);
+  const bm = ARENA_MARGIN;
+  demoOfer.x = clamp(demoOfer.x, bm + demoOfer.r, cw - bm - demoOfer.r);
+  demoOfer.y = clamp(demoOfer.y, bm + demoOfer.r, ch - bm - demoOfer.r);
 
   const rr = demoOfer.r + demoMushu.r;
   if (dist2(demoOfer.x, demoOfer.y, demoMushu.x, demoMushu.y) <= rr * rr){
@@ -1882,6 +1961,13 @@ function renderDemo(){
     ctx.fillText(label, b.x, b.y - vr - 4);
   }
 
+  if (demoPhase === 'JOYSTICK_DEMO'){
+    // Only Ofer is visible during the joystick tutorial
+    drawDemoBody(demoOfer, 'עופר 🤵', '#3cffb0');
+    return;
+  }
+
+  // CATCH_MUSHU phase: show both characters
   drawDemoBody(demoMushu, 'מושו 🐶', '#ff4fd8');
   drawDemoBody(demoOfer, 'עופר 🤵', '#3cffb0');
 }
@@ -4690,6 +4776,13 @@ function drawBody(b){
       ctx.translate(b.x, b.y + celebrationPose.bobY * 0.35);
       ctx.rotate(celebrationPose.headTilt);
       ctx.drawImage(stickerImg, -dw / 2, -dh / 2 - vr * 0.08, dw, dh);
+    } else if (talStage3IntroAngry){
+      // Render-only enlargement of angry Tal while she spits fire.
+      // Anchor at her feet so she "looms" upward; fire emission stays unchanged.
+      const angryBoost = 1.32;
+      ctx.translate(b.x, b.y + dh / 2);
+      ctx.scale(angryBoost, angryBoost);
+      ctx.drawImage(stickerImg, -dw / 2, -dh, dw, dh);
     } else {
       ctx.drawImage(stickerImg, b.x - dw / 2, b.y - dh / 2, dw, dh);
     }
@@ -5110,7 +5203,13 @@ function enterIdle(){
   applyStageParams(getStageCfg(StageId.STAGE_1));
   resizeCanvas();
   initDemoPositions();
-  demoTimerStarted = true; // Start timer as soon as start screen opens (initDemoPositions resets it)
+  // Reset tutorial hint text and finger for the joystick-demo phase
+  if (demoPanelHintEl) demoPanelHintEl.textContent = 'גרור את הג׳ויסטיק להזזת עופר';
+  if (startUIFingerEl){
+    startUIFingerEl.style.animation = 'none';
+    startUIFingerEl.style.transform = 'translateX(-50%)';
+  }
+  // Timer starts only when CATCH_MUSHU phase begins (set inside updateDemo on phase transition)
   demoLoop.lastT = 0;
   if (demoRafId) cancelAnimationFrame(demoRafId);
   demoRafId = requestAnimationFrame(demoLoop);
