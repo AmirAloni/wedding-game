@@ -2163,10 +2163,12 @@ getCelebrationMusicEl();
 // elements pick up the bytes from the HTTP cache when play() runs inside a
 // later user gesture.
 function initAudioPreload(onReady){
-  const loadingUiEl   = document.getElementById('loadingUI');
-  const loadingBarEl  = document.getElementById('loadingBar');
-  const loadingTrack  = document.getElementById('loadingTrack');
-  const loadingHintEl = loadingUiEl?.querySelector('.loadingUI-hint');
+  const loadingUiEl    = document.getElementById('loadingUI');
+  const loadingBarEl   = document.getElementById('loadingBar');
+  const loadingTrack   = document.getElementById('loadingTrack');
+  const loadingHintEl  = loadingUiEl?.querySelector('.loadingUI-hint');
+  const startBtnEl     = document.getElementById('loadingStartBtn');
+  const silentHintEl   = document.getElementById('loadingSilentHint');
   if (!loadingUiEl) { onReady?.(); return; }
 
   let dismissed = false;
@@ -2176,6 +2178,33 @@ function initAudioPreload(onReady){
     onReady?.();
     loadingUiEl.classList.add('loadingUI--done');
     setTimeout(() => { if (loadingUiEl.parentNode) loadingUiEl.remove(); }, 500);
+  }
+
+  // Application Security Requirement: gate dismissal on an explicit click so
+  // audio unlock runs inside a real iOS user-gesture (the most reliable signal
+  // for resuming AudioContext and "blessing" every <audio> element).
+  function showStartButton({ warningText } = {}){
+    if (loadingTrack) loadingTrack.classList.add('isHidden');
+    if (loadingHintEl){
+      if (warningText){
+        loadingHintEl.textContent = warningText;
+        loadingHintEl.classList.add('loadingUI-hint--error');
+      } else {
+        loadingHintEl.textContent = 'מוכנים? לחצו להתחלה';
+        loadingHintEl.classList.remove('loadingUI-hint--error');
+      }
+    }
+    if (silentHintEl) silentHintEl.classList.remove('isHidden');
+    if (!startBtnEl){ dismiss(); return; }
+    startBtnEl.classList.remove('isHidden');
+    const onStart = () => {
+      // Synchronous priming inside the click gesture: kick AudioContext.resume()
+      // and call play()/pause() on every <audio> before any await yields.
+      void ensureAudioUnlocked();
+      void primeHtmlAudioElements();
+      dismiss();
+    };
+    startBtnEl.addEventListener('click', onStart, { once: true });
   }
 
   // Exact byte sizes used as weights for weighted progress display.
@@ -2268,23 +2297,20 @@ function initAudioPreload(onReady){
     const hasErrors   = errors.length > 0;
     const hasWarnings = cacheWarnings.length > 0;
 
-    if (!hasErrors && !hasWarnings) { dismiss(); return; }
-    if (!loadingHintEl)             { dismiss(); return; }
+    if (!hasErrors && !hasWarnings){ showStartButton(); return; }
 
     const lines = [];
-    if (hasErrors) {
+    if (hasErrors){
       const list = errors.map(e => `${fileNameOf(e.url)} (${e.reason})`).join(', ');
       lines.push('בעיה בטעינת אודיו: ' + list + '. ממשיכים בכל זאת...');
     }
-    if (hasWarnings) {
+    if (hasWarnings){
       const list = cacheWarnings.map(w => `${fileNameOf(w.url)}: ${w.reason}`).join(', ');
       lines.push('אזהרת cache (השרת מסמן את הקבצים כלא-נשמרים — האודיו עלול להיטען מחדש בזמן ההשמעה): ' + list);
     }
 
     // textContent prevents any HTML interpretation of header-derived strings.
-    loadingHintEl.textContent = lines.join('\n');
-    loadingHintEl.classList.add('loadingUI-hint--error');
-    setTimeout(dismiss, hasErrors ? 3000 : 4500);
+    showStartButton({ warningText: lines.join('\n') });
   });
 }
 

@@ -1009,3 +1009,37 @@ canvas#game{
   margin-top: 2px;
 }
 .loadingUI-skip:active{ opacity: 1; }
+
+.loadingUI-startBtn{
+  margin-top: 8px;
+  width: 100%;
+  font-size: 20px;
+  padding: 16px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(52,124,86,.22);
+  background:
+    radial-gradient(100% 120% at 28% 18%, rgba(255,255,255,.72) 0%, rgba(255,255,255,0) 52%),
+    linear-gradient(135deg, rgba(245,217,120,.92), rgba(243,154,107,.9));
+  color: rgba(18,49,28,.92);
+  font-weight: 900;
+  letter-spacing: .04em;
+  box-shadow: 0 12px 30px rgba(243,154,107,.26);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.loadingUI-startBtn:focus-visible{
+  outline: 3px solid rgba(127,209,143,.4);
+  outline-offset: 3px;
+}
+.loadingUI-startBtn:active{
+  transform: translateY(1px) scale(.995);
+  filter: saturate(1.08);
+}
+
+.loadingUI-silentHint{
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 4px 0 0;
+  line-height: 1.35;
+}

@@ -10,7 +10,7 @@
   <body>
     <main id="app" aria-label="המשחק כאוס חתונה">
 
-      <!-- Audio preload screen — hidden by JS once all assets are cached -->
+      <!-- Audio preload screen — replaced by an explicit Tap-to-Start button once assets are cached -->
       <div id="loadingUI" class="loadingUI" aria-live="polite" aria-label="טוען את המשחק">
         <div class="loadingUI-box">
           <div class="loadingUI-deco" aria-hidden="true">💍 🐕‍🦺 💍</div>
@@ -19,6 +19,8 @@
           <div class="loadingUI-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="loadingTrack">
             <div id="loadingBar" class="loadingUI-fill"></div>
           </div>
+          <button id="loadingStartBtn" class="loadingUI-startBtn isHidden" type="button">להתחיל</button>
+          <p id="loadingSilentHint" class="loadingUI-silentHint isHidden">אם אין סאונד — בדקו את מתג ההשתקה בצד המכשיר</p>
         </div>
       </div>
 
