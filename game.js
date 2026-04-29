@@ -1753,7 +1753,7 @@ function initDemoPositions(){
   const w = canvas.width || 400;
   const h = canvas.height || 700;
   demoOfer.x = w * 0.5;
-  demoOfer.y = h * 0.62;
+  demoOfer.y = h * 0.5;
   demoOfer.vx = 0;
   demoOfer.vy = 0;
   demoMushu.x = w * 0.5;
@@ -1832,9 +1832,9 @@ function updateDemo(dt){
       }
       // Update hint text
       if (demoPanelHintEl) demoPanelHintEl.textContent = 'עכשיו תפסו את מושו! 🐶';
-      // Reset Ofer to center so the user starts from a fair position
+      // Reset Ofer to screen center (width + height) for the catch phase
       demoOfer.x = cw * 0.5;
-      demoOfer.y = ch * 0.72;
+      demoOfer.y = ch * 0.5;
       demoOfer.vx = 0;
       demoOfer.vy = 0;
       // Start the countdown timer now that real play begins
